@@ -92,7 +92,6 @@ main(i32 argc, char **argv) {
     const i32 max_cell_count = grid_size * grid_size;
 
     SDL_Rect rects[max_cell_count];
-    SDL_Rect grid_rects[max_cell_count];
     Position positions[max_cell_count];
 
     //Init cells
@@ -103,17 +102,6 @@ main(i32 argc, char **argv) {
         rect->h = cell_height;
         rect->x = pos->x = 0;
         rect->y = pos->y = 0;
-    }
-
-    //Init grid
-    for(i32 y = 0; y < grid_size; y++) {
-        for(i32 x = 0; x < grid_size; x++) {
-            SDL_Rect* rect = &grid_rects[y * grid_size + x];
-            rect->x = x * cell_width;
-            rect->y = y * cell_height;
-            rect->w = cell_width;
-            rect->h = cell_height;
-        }
     }
 
     i32 snake_cell_count = 1;
@@ -168,7 +156,14 @@ main(i32 argc, char **argv) {
         {
         const i32 k = 64;
         SDL_SetRenderDrawColor(renderer, k, k, k, 128);
-        SDL_RenderDrawRects(renderer, grid_rects, max_cell_count);
+        for(i32 i = cell_width; i < SCREEN_WIDTH; i+=cell_width) {
+            SDL_RenderDrawLine(renderer, i, 0, i, SCREEN_HEIGHT);
+            SDL_RenderDrawLine(renderer, i-1, 0, i-1, SCREEN_HEIGHT);
+        }
+        for(i32 i = cell_width; i < SCREEN_HEIGHT; i+=cell_width) {
+            SDL_RenderDrawLine(renderer, 0, i, SCREEN_WIDTH, i);
+            SDL_RenderDrawLine(renderer, 0, i-1, SCREEN_WIDTH, i-1);
+        }
         }
 
         {
