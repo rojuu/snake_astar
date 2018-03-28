@@ -92,6 +92,7 @@ main(i32 argc, char **argv) {
     const i32 max_cell_count = grid_size * grid_size;
 
     SDL_Rect rects[max_cell_count];
+    SDL_Rect grid_rects[max_cell_count];
     Position positions[max_cell_count];
 
     //Init cells
@@ -104,14 +105,6 @@ main(i32 argc, char **argv) {
         rect->y = pos->y = 0;
     }
 
-    rects[1].x = 1 * cell_width;
-    rects[1].y = 0.5f * cell_height;
-
-    rects[2].x = 2 * cell_width;
-    rects[2].y = 0 * cell_height;
-
-    SDL_Rect grid_rects[max_cell_count];
-
     //Init grid
     for(i32 y = 0; y < grid_size; y++) {
         for(i32 x = 0; x < grid_size; x++) {
@@ -123,7 +116,7 @@ main(i32 argc, char **argv) {
         }
     }
 
-    i32 cell_count = 1;
+    i32 snake_cell_count = 1;
 
     b32 running = true;
     f64 current_time = (f32)SDL_GetPerformanceCounter() /
@@ -181,7 +174,7 @@ main(i32 argc, char **argv) {
         {
         const i32 k = 255;
         SDL_SetRenderDrawColor(renderer, k, k, k, 255);
-        SDL_RenderFillRects(renderer, rects, cell_count);
+        SDL_RenderFillRects(renderer, rects, snake_cell_count);
         }
 
         SDL_RenderPresent(renderer);
