@@ -86,26 +86,42 @@ main(i32 argc, char **argv) {
 
     const i32 grid_size = 32;
 
-    const i32 snake_cell_width = SCREEN_WIDTH / grid_size;
-    const i32 snake_cell_height = SCREEN_HEIGHT / grid_size;
+    const i32 cell_width = SCREEN_WIDTH / grid_size;
+    const i32 cell_height = SCREEN_HEIGHT / grid_size;
 
-    const i32 max_snake_cell_count = grid_size * grid_size;
+    const i32 max_cell_count = grid_size * grid_size;
 
-    SDL_Rect rects[max_snake_cell_count];
-    Position positions[max_snake_cell_count];
+    SDL_Rect rects[max_cell_count];
+    Position positions[max_cell_count];
 
-    for(i32 i = 0; i < max_snake_cell_count; i++) {
-        rects[i].w = snake_cell_width;
-        rects[i].h = snake_cell_height;
-        rects[i].x = positions[i].x = 0;
-        rects[i].y = positions[i].y = 0;
+    //Init cells
+    for(i32 i = 0; i < max_cell_count; i++) {
+        SDL_Rect *rect = &rects[i];
+        Position *pos = &positions[i];
+        rect->w = cell_width;
+        rect->h = cell_height;
+        rect->x = pos->x = 0;
+        rect->y = pos->y = 0;
     }
 
-    rects[1].x = 1 * snake_cell_width;
-    rects[1].y = 0.5f * snake_cell_height;
+    rects[1].x = 1 * cell_width;
+    rects[1].y = 0.5f * cell_height;
 
-    rects[2].x = 2 * snake_cell_width;
-    rects[2].y = 0 * snake_cell_height;
+    rects[2].x = 2 * cell_width;
+    rects[2].y = 0 * cell_height;
+
+    SDL_Rect grid_rects[max_cell_count];
+
+    //Init grid
+    for(i32 y = 0; y < grid_size; y++) {
+        for(i32 x = 0; x < grid_size; x++) {
+            SDL_Rect* rect = &grid_rects[y * grid_size + x];
+            rect->x = x * cell_width;
+            rect->y = y * cell_height;
+            rect->w = cell_width;
+            rect->h = cell_height;
+        }
+    }
 
     i32 cell_count = 1;
 
@@ -156,15 +172,17 @@ main(i32 argc, char **argv) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
-        SDL_SetRenderDrawColor(renderer, 255, 0, 255, 255);
-        //SDL_RenderFillRects(renderer, rects, cell_count);
-        SDL_RenderFillRect(renderer, &rects[0]);
-        SDL_SetRenderDrawColor(renderer, 255, 255, 0, 255);
-        SDL_RenderFillRect(renderer, &rects[1]);
-        SDL_SetRenderDrawColor(renderer, 0, 255, 255, 255);
-        SDL_RenderFillRect(renderer, &rects[2]);
+        {
+        const i32 k = 64;
+        SDL_SetRenderDrawColor(renderer, k, k, k, 128);
+        SDL_RenderDrawRects(renderer, grid_rects, max_cell_count);
+        }
 
-
+        {
+        const i32 k = 255;
+        SDL_SetRenderDrawColor(renderer, k, k, k, 255);
+        SDL_RenderFillRects(renderer, rects, cell_count);
+        }
 
         SDL_RenderPresent(renderer);
     }
