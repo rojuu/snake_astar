@@ -60,6 +60,25 @@ struct Position {
     i32 x, y;
 };
 
+struct Grid {
+    i32 grid_size, max_cell_count;
+    i32 cell_width, cell_height;
+};
+
+void
+render_grid(SDL_Renderer *renderer, Grid grid) {
+    const i32 k = 64;
+    SDL_SetRenderDrawColor(renderer, k, k, k, 128);
+    for(i32 i = grid.cell_width; i < SCREEN_WIDTH; i+=grid.cell_width) {
+        SDL_RenderDrawLine(renderer, i, 0, i, SCREEN_HEIGHT);
+        SDL_RenderDrawLine(renderer, i-1, 0, i-1, SCREEN_HEIGHT);
+    }
+    for(i32 i = grid.cell_width; i < SCREEN_HEIGHT; i+=grid.cell_width) {
+        SDL_RenderDrawLine(renderer, 0, i, SCREEN_WIDTH, i);
+        SDL_RenderDrawLine(renderer, 0, i-1, SCREEN_WIDTH, i-1);
+    }
+}
+
 i32
 main(i32 argc, char **argv) {
     // Init SDL stuff
@@ -90,6 +109,23 @@ main(i32 argc, char **argv) {
     const i32 cell_height = SCREEN_HEIGHT / grid_size;
 
     const i32 max_cell_count = grid_size * grid_size;
+
+    Grid grid;
+    grid.grid_size = grid_size;
+    grid.cell_width = cell_width;
+    grid.cell_height = cell_height;
+    grid.max_cell_count = max_cell_count;
+
+    SDL_Texture* grid_texture;
+    {
+    SDL_Surface* grid_surface;
+    grid_surface = SDL_CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32, 0, 0, 0, 0);
+    SDL_Renderer* grid_renderer = SDL_CreateSoftwareRenderer(grid_surface);
+    render_grid(grid_renderer, grid);
+    grid_texture = SDL_CreateTextureFromSurface(renderer, grid_surface);
+    SDL_DestroyRenderer(grid_renderer);
+    SDL_FreeSurface(grid_surface);
+    }
 
     SDL_Rect rects[max_cell_count];
     Position positions[max_cell_count];
@@ -153,18 +189,8 @@ main(i32 argc, char **argv) {
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
-        {
-        const i32 k = 64;
-        SDL_SetRenderDrawColor(renderer, k, k, k, 128);
-        for(i32 i = cell_width; i < SCREEN_WIDTH; i+=cell_width) {
-            SDL_RenderDrawLine(renderer, i, 0, i, SCREEN_HEIGHT);
-            SDL_RenderDrawLine(renderer, i-1, 0, i-1, SCREEN_HEIGHT);
-        }
-        for(i32 i = cell_width; i < SCREEN_HEIGHT; i+=cell_width) {
-            SDL_RenderDrawLine(renderer, 0, i, SCREEN_WIDTH, i);
-            SDL_RenderDrawLine(renderer, 0, i-1, SCREEN_WIDTH, i-1);
-        }
-        }
+        //render_grid(renderer, grid);
+        SDL_RenderCopy(renderer, grid_texture, 0, 0);
 
         {
         const i32 k = 255;
