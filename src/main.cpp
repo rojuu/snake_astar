@@ -11,6 +11,8 @@
 #include "glm/gtc/type_ptr.hpp"
 #include "glm/gtc/matrix_transform.hpp"
 #include <cstdint>
+#include <fstream>
+#include <string>
 
 /** TODO: 
  * 
@@ -65,8 +67,21 @@ struct Grid {
     i32 cell_width, cell_height;
 };
 
-void
-render_grid(SDL_Renderer *renderer, Grid grid) {
+enum INPUT_ENUM_FLAGS {
+    INPUT_UP    = 0x0001,
+    INPUT_DOWN  = 0x0002,
+    INPUT_LEFT  = 0x0004,
+    INPUT_RIGHT = 0x0008,
+};
+
+struct Game_Data {
+    u32 input_flags;
+    Position* positions;
+    i32 snake_cell_count;
+};
+
+internal void
+render_grid(SDL_Renderer *renderer, const Grid &grid) {
     const i32 k = 64;
     SDL_SetRenderDrawColor(renderer, k, k, k, 128);
     for(i32 i = grid.cell_width; i < SCREEN_WIDTH; i+=grid.cell_width) {
@@ -77,6 +92,12 @@ render_grid(SDL_Renderer *renderer, Grid grid) {
         SDL_RenderDrawLine(renderer, 0, i, SCREEN_WIDTH, i);
         SDL_RenderDrawLine(renderer, 0, i-1, SCREEN_WIDTH, i-1);
     }
+}
+
+internal void
+game_loop(Game_Data &data, const Grid &grid) {
+    data.positions[0].x = (++data.positions[0].x) % grid.grid_size;
+    data.input_flags = 0;
 }
 
 i32
@@ -118,8 +139,7 @@ main(i32 argc, char **argv) {
 
     SDL_Texture* grid_texture;
     {
-    SDL_Surface* grid_surface;
-    grid_surface = SDL_CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32, 0, 0, 0, 0);
+    SDL_Surface* grid_surface = SDL_CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32, 0, 0, 0, 0);
     SDL_Renderer* grid_renderer = SDL_CreateSoftwareRenderer(grid_surface);
     render_grid(grid_renderer, grid);
     grid_texture = SDL_CreateTextureFromSurface(renderer, grid_surface);
@@ -140,9 +160,13 @@ main(i32 argc, char **argv) {
         rect->y = pos->y = 0;
     }
 
-    i32 snake_cell_count = 1;
+    Game_Data game_data;
+    game_data.positions = positions;
+    game_data.input_flags = 0;
+    game_data.snake_cell_count = 1;
 
     b32 running = true;
+    f64 frame_time = 1.f;
     f64 current_time = (f32)SDL_GetPerformanceCounter() /
                        (f32)SDL_GetPerformanceFrequency();
     f64 last_time = 0;
@@ -150,13 +174,14 @@ main(i32 argc, char **argv) {
     i32 frame_counter = 0;
     i32 last_frame_count = 0;
     f64 last_fps_time = 0;
+    f64 last_update_time = 0;
     while (running) {
         last_time = current_time;
         current_time = (f64)SDL_GetPerformanceCounter() /
                        (f64)SDL_GetPerformanceFrequency();
         delta_time = (f64)(current_time - last_time);
 
-        // Count frames for every second and pri32 it as the title of the window
+        // Count frames for every second and print it as the title of the window
         ++frame_counter;
         if (current_time >= (last_fps_time + 1.f)) {
             last_fps_time = current_time;
@@ -181,21 +206,58 @@ main(i32 argc, char **argv) {
                             running = false;
                         }
                         break;
+
+                        case SDLK_UP: {
+                            game_data.input_flags = game_data.input_flags | INPUT_UP;
+                        }
+                        break;
+
+                        case SDLK_DOWN: {
+                            game_data.input_flags = game_data.input_flags | INPUT_DOWN;
+                        }
+                        break;
+
+                        case SDLK_LEFT: {
+                            game_data.input_flags = game_data.input_flags | INPUT_LEFT;
+                        }
+                        break;
+
+                        case SDLK_RIGHT: {
+                            game_data.input_flags = game_data.input_flags | INPUT_RIGHT;
+                        }
+                        break;
                     }
                 } break;
             }
         }
 
+        //Update game logic
+        if(current_time >= (last_update_time + frame_time)) {
+            last_update_time = current_time;
+            game_loop(game_data, grid);
+        }
+
+        //Update positions for rendering
+        for(i32 i = 0; i < game_data.snake_cell_count; i++) {
+            auto rect = &rects[i];
+            auto position = &positions[i];
+            rect->x = positions->x * cell_width;
+            rect->y = positions->y * cell_height;
+        }
+
+
+        //Rendering
+        //TODO: Render with OpenGL to get Vsync, so we don't hog all the cpu resources?
+        // We could still use SDL rendering functions for the actual drawing and just send the texture to OpenGL
         SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
         SDL_RenderClear(renderer);
 
-        //render_grid(renderer, grid);
         SDL_RenderCopy(renderer, grid_texture, 0, 0);
 
         {
         const i32 k = 255;
         SDL_SetRenderDrawColor(renderer, k, k, k, 255);
-        SDL_RenderFillRects(renderer, rects, snake_cell_count);
+        SDL_RenderFillRects(renderer, rects, game_data.snake_cell_count);
         }
 
         SDL_RenderPresent(renderer);
