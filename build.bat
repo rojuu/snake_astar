@@ -20,9 +20,6 @@ pushd bin
 if not exist SDL2.dll (
     robocopy %SDL_LIB% . SDL2.dll
 )
-if not exist glew32.dll (
-    robocopy %GLEW_BIN% . glew32.dll
-)
 
 cl %CommonCompilerFlags% ..\src\main.cpp /link /subsystem:console %CommonLinkerFlags% /out:snake_astar.exe
 popd
