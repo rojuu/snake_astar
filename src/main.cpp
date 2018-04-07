@@ -14,8 +14,8 @@
 #include <fstream>
 #include <string>
 
-/** TODO: 
- * 
+/** TODO:
+ *
  * Should we actually use windows.h rather than SDL?
  * If we'd do that, we could use some useful windows API calls.
  * Maybe still use SDL, but only use those calls for useful stuff?
@@ -24,6 +24,7 @@
 **/
 
 #define internal static
+#define global_variable static
 
 #define array_count(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 
@@ -62,11 +63,6 @@ struct Position {
     i32 x, y;
 };
 
-struct Grid {
-    i32 grid_size, max_cell_count;
-    i32 cell_width, cell_height;
-};
-
 enum INPUT_ENUM_FLAGS {
     INPUT_UP    = 0x0001,
     INPUT_DOWN  = 0x0002,
@@ -74,31 +70,62 @@ enum INPUT_ENUM_FLAGS {
     INPUT_RIGHT = 0x0008,
 };
 
-struct Game_Data {
-    u32 input_flags;
-    Position* positions;
-    i32 snake_cell_count;
-};
+const i32 grid_size = 32;
+
+const i32 cell_width = SCREEN_WIDTH / grid_size;
+const i32 cell_height = SCREEN_HEIGHT / grid_size;
+
+const i32 max_cell_count = grid_size * grid_size;
+
+global_variable i32 snake_cell_count;
+global_variable i32 input_flags;
+global_variable Position positions[max_cell_count];
+global_variable Position positions_last_frame[max_cell_count];
+global_variable Position& snake_pos = positions[0];
+global_variable SDL_Rect rects[max_cell_count];
 
 internal void
-render_grid(SDL_Renderer *renderer, const Grid &grid) {
+render_grid(SDL_Renderer *renderer) {
     const i32 k = 64;
     SDL_SetRenderDrawColor(renderer, k, k, k, 128);
-    for(i32 i = grid.cell_width; i < SCREEN_WIDTH; i+=grid.cell_width) {
+    for(i32 i = cell_width; i < SCREEN_WIDTH; i+=cell_width) {
         SDL_RenderDrawLine(renderer, i, 0, i, SCREEN_HEIGHT);
         SDL_RenderDrawLine(renderer, i-1, 0, i-1, SCREEN_HEIGHT);
     }
-    for(i32 i = grid.cell_width; i < SCREEN_HEIGHT; i+=grid.cell_width) {
+    for(i32 i = cell_width; i < SCREEN_HEIGHT; i+=cell_width) {
         SDL_RenderDrawLine(renderer, 0, i, SCREEN_WIDTH, i);
         SDL_RenderDrawLine(renderer, 0, i-1, SCREEN_WIDTH, i-1);
     }
 }
 
+global_variable b32 increase_snake_cell_count = false;
+global_variable b32 decrease_snake_cell_count = false;
+
 internal void
-game_loop(Game_Data &data, const Grid &grid) {
-    data.positions[0].x = (++data.positions[0].x) % grid.grid_size;
-    data.input_flags = 0;
+game_loop() {
+    printf("snake_cell_count: %d\n", snake_cell_count);
+
+    if(increase_snake_cell_count) {
+        snake_cell_count = glm::min(++snake_cell_count, max_cell_count);
+    } else if(decrease_snake_cell_count) {
+        snake_cell_count = glm::max(--snake_cell_count, 0);
+    }
+
+    for(i32 i = 1; i < snake_cell_count; i++) {
+        positions[i].x = positions_last_frame[i-1].x;
+        positions[i].y = positions_last_frame[i-1].y;
+    }
+
+    snake_pos.x = (++snake_pos.x) % grid_size;
+
+    for(i32 i = 0; i < snake_cell_count; i++) {
+        positions_last_frame[i].x = positions[i].x;
+        positions_last_frame[i].y = positions[i].y;
+    }
 }
+
+global_variable b32 pressed_a = false;
+global_variable b32 pressed_s = false;
 
 i32
 main(i32 argc, char **argv) {
@@ -124,46 +151,28 @@ main(i32 argc, char **argv) {
         return -1;
     }
 
-    const i32 grid_size = 32;
-
-    const i32 cell_width = SCREEN_WIDTH / grid_size;
-    const i32 cell_height = SCREEN_HEIGHT / grid_size;
-
-    const i32 max_cell_count = grid_size * grid_size;
-
-    Grid grid;
-    grid.grid_size = grid_size;
-    grid.cell_width = cell_width;
-    grid.cell_height = cell_height;
-    grid.max_cell_count = max_cell_count;
-
     SDL_Texture* grid_texture;
     {
     SDL_Surface* grid_surface = SDL_CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32, 0, 0, 0, 0);
     SDL_Renderer* grid_renderer = SDL_CreateSoftwareRenderer(grid_surface);
-    render_grid(grid_renderer, grid);
+    render_grid(grid_renderer);
     grid_texture = SDL_CreateTextureFromSurface(renderer, grid_surface);
     SDL_DestroyRenderer(grid_renderer);
     SDL_FreeSurface(grid_surface);
     }
 
-    SDL_Rect rects[max_cell_count];
-    Position positions[max_cell_count];
-
     //Init cells
     for(i32 i = 0; i < max_cell_count; i++) {
-        SDL_Rect *rect = &rects[i];
-        Position *pos = &positions[i];
-        rect->w = cell_width;
-        rect->h = cell_height;
-        rect->x = pos->x = 0;
-        rect->y = pos->y = 0;
+        auto& rect = rects[i];
+        auto& pos = positions[i];
+        rect.w = cell_width;
+        rect.h = cell_height;
+        rect.x = pos.x = 0;
+        rect.y = pos.y = 0;
     }
 
-    Game_Data game_data;
-    game_data.positions = positions;
-    game_data.input_flags = 0;
-    game_data.snake_cell_count = 1;
+    input_flags = 0;
+    snake_cell_count = 1;
 
     b32 running = true;
     f64 frame_time = 1.f;
@@ -208,41 +217,66 @@ main(i32 argc, char **argv) {
                         break;
 
                         case SDLK_UP: {
-                            game_data.input_flags = game_data.input_flags | INPUT_UP;
+                            input_flags = input_flags | INPUT_UP;
                         }
                         break;
 
                         case SDLK_DOWN: {
-                            game_data.input_flags = game_data.input_flags | INPUT_DOWN;
+                            input_flags = input_flags | INPUT_DOWN;
                         }
                         break;
 
                         case SDLK_LEFT: {
-                            game_data.input_flags = game_data.input_flags | INPUT_LEFT;
+                            input_flags = input_flags | INPUT_LEFT;
                         }
                         break;
 
                         case SDLK_RIGHT: {
-                            game_data.input_flags = game_data.input_flags | INPUT_RIGHT;
+                            input_flags = input_flags | INPUT_RIGHT;
+                        }
+                        break;
+                        case 'a': {
+                            if(!pressed_a) {
+                                pressed_a = true;
+                                decrease_snake_cell_count = true;
+                            }
+                        }
+                        break;
+                        case 's': {
+                            if(!pressed_s) {
+                                pressed_s = true;
+                                increase_snake_cell_count = true;
+                            }
                         }
                         break;
                     }
                 } break;
+
+                case SDL_KEYUP: {
+                    case 'a': {
+                        pressed_a = false;
+                    }
+                    case 's': {
+                        pressed_s = false;
+                    }
+                }
             }
         }
 
         //Update game logic
         if(current_time >= (last_update_time + frame_time)) {
             last_update_time = current_time;
-            game_loop(game_data, grid);
+            game_loop();
+            input_flags = 0;
+            decrease_snake_cell_count = increase_snake_cell_count = false;
         }
 
         //Update positions for rendering
-        for(i32 i = 0; i < game_data.snake_cell_count; i++) {
-            auto rect = &rects[i];
-            auto position = &positions[i];
-            rect->x = positions->x * cell_width;
-            rect->y = positions->y * cell_height;
+        for(i32 i = 0; i < snake_cell_count; i++) {
+            auto& rect = rects[i];
+            auto& position = positions[i];
+            rect.x = position.x * cell_width;
+            rect.y = position.y * cell_height;
         }
 
 
@@ -257,7 +291,7 @@ main(i32 argc, char **argv) {
         {
         const i32 k = 255;
         SDL_SetRenderDrawColor(renderer, k, k, k, 255);
-        SDL_RenderFillRects(renderer, rects, game_data.snake_cell_count);
+        SDL_RenderFillRects(renderer, rects, snake_cell_count);
         }
 
         SDL_RenderPresent(renderer);
