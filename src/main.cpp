@@ -54,35 +54,43 @@ typedef glm::mat2 m2;
 typedef glm::mat3 m3;
 typedef glm::mat4 m4;
 
-internal const f32 PI = glm::pi<f32>();
+global_variable const f32 PI = glm::pi<f32>();
 
-const i32 SCREEN_WIDTH = 512;
-const i32 SCREEN_HEIGHT = 512;
+global_variable const i32 SCREEN_WIDTH = 512;
+global_variable const i32 SCREEN_HEIGHT = 512;
 
 struct Position {
     i32 x, y;
 };
 
-enum INPUT_ENUM_FLAGS {
-    INPUT_UP    = 0x0001,
-    INPUT_DOWN  = 0x0002,
-    INPUT_LEFT  = 0x0004,
-    INPUT_RIGHT = 0x0008,
+enum INPUT_E {
+    INPUT_UP,
+    INPUT_DOWN,
+    INPUT_LEFT,
+    INPUT_RIGHT,
 };
 
-const i32 grid_size = 32;
+enum DIRECTION_E {
+    DIRECTION_UP,
+    DIRECTION_DOWN,
+    DIRECTION_LEFT,
+    DIRECTION_RIGHT,
+};
 
-const i32 cell_width = SCREEN_WIDTH / grid_size;
-const i32 cell_height = SCREEN_HEIGHT / grid_size;
+global_variable const i32 grid_size = 32;
 
-const i32 max_cell_count = grid_size * grid_size;
+global_variable const i32 cell_width = SCREEN_WIDTH / grid_size;
+global_variable const i32 cell_height = SCREEN_HEIGHT / grid_size;
+
+global_variable const i32 max_cell_count = grid_size * grid_size;
 
 global_variable i32 snake_cell_count;
-global_variable i32 input_flags;
+global_variable i32 input;
 global_variable Position positions[max_cell_count];
 global_variable Position positions_last_frame[max_cell_count];
 global_variable Position& snake_pos = positions[0];
 global_variable SDL_Rect rects[max_cell_count];
+global_variable i32 direction = DIRECTION_RIGHT;
 
 internal void
 render_grid(SDL_Renderer *renderer) {
@@ -103,7 +111,28 @@ global_variable b32 decrease_snake_cell_count = false;
 
 internal void
 game_loop() {
-    printf("snake_cell_count: %d\n", snake_cell_count);
+    switch(input) {
+        case INPUT_UP:
+            if(direction == DIRECTION_RIGHT || direction == DIRECTION_LEFT) {
+                direction = DIRECTION_UP;
+            }
+        break;
+        case INPUT_DOWN:
+            if(direction == DIRECTION_RIGHT || direction == DIRECTION_LEFT) {
+                direction = DIRECTION_DOWN;
+            }
+        break;
+        case INPUT_RIGHT:
+            if(direction == DIRECTION_UP || direction == DIRECTION_DOWN) {
+                direction = DIRECTION_RIGHT;
+            }
+        break;
+        case INPUT_LEFT:
+            if(direction == DIRECTION_UP || direction == DIRECTION_DOWN) {
+                direction = DIRECTION_LEFT;
+            }
+        break;
+    }
 
     if(increase_snake_cell_count) {
         snake_cell_count = glm::min(++snake_cell_count, max_cell_count);
@@ -116,12 +145,34 @@ game_loop() {
         positions[i].y = positions_last_frame[i-1].y;
     }
 
-    snake_pos.x = (++snake_pos.x) % grid_size;
+    {
+        i32 new_value;
+        switch(direction) {
+            case DIRECTION_UP:
+                new_value = ++snake_pos.y;
+                snake_pos.y = new_value % grid_size;
+            break;
+            case DIRECTION_DOWN:
+                new_value = --snake_pos.y;
+                snake_pos.y = new_value < 0 ? grid_size-1 : new_value;
+            break;
+            case DIRECTION_LEFT:
+                new_value = --snake_pos.x;
+                snake_pos.x = new_value < 0 ? grid_size-1 : new_value;
+            break;
+            case DIRECTION_RIGHT:
+                new_value = ++snake_pos.x;
+                snake_pos.x = new_value % grid_size;
+            break;
+        }
+    }
 
     for(i32 i = 0; i < snake_cell_count; i++) {
         positions_last_frame[i].x = positions[i].x;
         positions_last_frame[i].y = positions[i].y;
     }
+
+    printf("snake pos: %d %d\n", snake_pos.x, snake_pos.y);
 }
 
 global_variable b32 pressed_a = false;
@@ -171,11 +222,11 @@ main(i32 argc, char **argv) {
         rect.y = pos.y = 0;
     }
 
-    input_flags = 0;
+    input = -1;
     snake_cell_count = 1;
 
     b32 running = true;
-    f64 frame_time = 1.f;
+    f64 frame_time = 0.2f;
     f64 current_time = (f32)SDL_GetPerformanceCounter() /
                        (f32)SDL_GetPerformanceFrequency();
     f64 last_time = 0;
@@ -217,22 +268,22 @@ main(i32 argc, char **argv) {
                         break;
 
                         case SDLK_UP: {
-                            input_flags = input_flags | INPUT_UP;
+                            input = INPUT_UP;
                         }
                         break;
 
                         case SDLK_DOWN: {
-                            input_flags = input_flags | INPUT_DOWN;
+                            input = INPUT_DOWN;
                         }
                         break;
 
                         case SDLK_LEFT: {
-                            input_flags = input_flags | INPUT_LEFT;
+                            input = INPUT_LEFT;
                         }
                         break;
 
                         case SDLK_RIGHT: {
-                            input_flags = input_flags | INPUT_RIGHT;
+                            input = INPUT_RIGHT;
                         }
                         break;
                         case 'a': {
@@ -267,7 +318,6 @@ main(i32 argc, char **argv) {
         if(current_time >= (last_update_time + frame_time)) {
             last_update_time = current_time;
             game_loop();
-            input_flags = 0;
             decrease_snake_cell_count = increase_snake_cell_count = false;
         }
 
@@ -276,7 +326,7 @@ main(i32 argc, char **argv) {
             auto& rect = rects[i];
             auto& position = positions[i];
             rect.x = position.x * cell_width;
-            rect.y = position.y * cell_height;
+            rect.y = (grid_size - position.y - 1) * cell_height;
         }
 
 
