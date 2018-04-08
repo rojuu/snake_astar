@@ -111,6 +111,11 @@ global_variable b32 decrease_snake_cell_count = false;
 
 global_variable b32 collided = false;
 
+global_variable const u32 flash_count   = 5;
+global_variable       u32 flash_counter = 0;
+
+global_variable b32 draw_snake = true;
+
 internal void
 reset_state() {
     collided = false;
@@ -132,6 +137,23 @@ reset_state() {
 
     input = -1;
     snake_cell_count = 3;
+    flash_counter = 0;
+    draw_snake = true;
+}
+
+internal void
+reset_routine() {
+    if(flash_counter < flash_count) {
+        if(flash_counter % 2 == 0) {
+            draw_snake = false;
+        } else {
+            draw_snake = true;
+        }
+
+        ++flash_counter;
+    } else {
+        reset_state();
+    }
 }
 
 internal void
@@ -336,10 +358,11 @@ main(i32 argc, char **argv) {
         //Update game logic
         if(current_time >= (last_update_time + frame_time)) {
             last_update_time = current_time;
-            game_loop();
-            decrease_snake_cell_count = increase_snake_cell_count = false;
-            if(collided) {
-                reset_state();
+            if(!collided) {
+                game_loop();
+                decrease_snake_cell_count = increase_snake_cell_count = false;
+            } else {
+                reset_routine();
             }
         }
 
@@ -359,10 +382,10 @@ main(i32 argc, char **argv) {
 
         SDL_RenderCopy(renderer, grid_texture, 0, 0);
 
-        {
-        const i32 k = 255;
-        SDL_SetRenderDrawColor(renderer, k, k, k, 255);
-        SDL_RenderFillRects(renderer, rects, snake_cell_count);
+        if (draw_snake) {
+            const i32 k = 255;
+            SDL_SetRenderDrawColor(renderer, k, k, k, 255);
+            SDL_RenderFillRects(renderer, rects, snake_cell_count);
         }
 
         SDL_RenderPresent(renderer);
