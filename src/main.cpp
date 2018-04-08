@@ -109,6 +109,31 @@ render_grid(SDL_Renderer *renderer) {
 global_variable b32 increase_snake_cell_count = false;
 global_variable b32 decrease_snake_cell_count = false;
 
+global_variable b32 collided = false;
+
+internal void
+reset_state() {
+    collided = false;
+
+    snake_pos.x = rand() % grid_size;
+    snake_pos.y = rand() % grid_size;
+
+    for(i32 i = 0; i < max_cell_count; i++) {
+        auto& rect = rects[i];
+        auto& pos = positions[i];
+
+        rect.w = cell_width;
+        rect.h = cell_height;
+        pos.x = snake_pos.x;// snake_pos.x;
+        pos.y = snake_pos.y;// snake_pos.y;
+
+        positions_last_frame[i] = pos;
+    }
+
+    input = -1;
+    snake_cell_count = 3;
+}
+
 internal void
 game_loop() {
     switch(input) {
@@ -167,12 +192,16 @@ game_loop() {
         }
     }
 
+    for(i32 i = 1; i < snake_cell_count; i++) {
+        if(snake_pos.x == positions[i].x && snake_pos.y == positions[i].y) {
+            collided = true;
+        }
+    }
+
     for(i32 i = 0; i < snake_cell_count; i++) {
         positions_last_frame[i].x = positions[i].x;
         positions_last_frame[i].y = positions[i].y;
     }
-
-    printf("snake pos: %d %d\n", snake_pos.x, snake_pos.y);
 }
 
 global_variable b32 pressed_a = false;
@@ -212,18 +241,8 @@ main(i32 argc, char **argv) {
     SDL_FreeSurface(grid_surface);
     }
 
-    //Init cells
-    for(i32 i = 0; i < max_cell_count; i++) {
-        auto& rect = rects[i];
-        auto& pos = positions[i];
-        rect.w = cell_width;
-        rect.h = cell_height;
-        rect.x = pos.x = 0;
-        rect.y = pos.y = 0;
-    }
-
-    input = -1;
-    snake_cell_count = 1;
+    srand(time(0));
+    reset_state();
 
     b32 running = true;
     f64 frame_time = 0.2f;
@@ -319,6 +338,9 @@ main(i32 argc, char **argv) {
             last_update_time = current_time;
             game_loop();
             decrease_snake_cell_count = increase_snake_cell_count = false;
+            if(collided) {
+                reset_state();
+            }
         }
 
         //Update positions for rendering
@@ -328,7 +350,6 @@ main(i32 argc, char **argv) {
             rect.x = position.x * cell_width;
             rect.y = (grid_size - position.y - 1) * cell_height;
         }
-
 
         //Rendering
         //TODO: Render with OpenGL to get Vsync, so we don't hog all the cpu resources?
