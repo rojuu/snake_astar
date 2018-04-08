@@ -56,8 +56,8 @@ typedef glm::mat4 m4;
 
 global_variable const f32 PI = glm::pi<f32>();
 
-global_variable const i32 SCREEN_WIDTH = 512;
-global_variable const i32 SCREEN_HEIGHT = 512;
+global_variable const i32 SCREEN_WIDTH = 256;
+global_variable const i32 SCREEN_HEIGHT = 256;
 
 struct Position {
     i32 x, y;
@@ -77,12 +77,18 @@ enum DIRECTION_E {
     DIRECTION_RIGHT,
 };
 
-global_variable const i32 grid_size = 32;
+global_variable const i32 grid_size = 8;
 
 global_variable const i32 cell_width = SCREEN_WIDTH / grid_size;
 global_variable const i32 cell_height = SCREEN_HEIGHT / grid_size;
 
 global_variable const i32 max_cell_count = grid_size * grid_size;
+
+global_variable const f64 start_frame_time = 0.2;
+global_variable const f64 min_frame_time = 0.00015;
+global_variable const f64 speed_up_rate = 0.95;
+
+global_variable f64 frame_time;
 
 global_variable i32 snake_cell_count;
 global_variable i32 input;
@@ -117,7 +123,6 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
     i32 count = (radius*2) * (radius*2);
     i32 point_count = 0;
     SDL_Point* point_buffer = (SDL_Point*)malloc(sizeof(SDL_Point) * count * count);
-    // SDL_Point* point_buffer = new SDL_Point[count];
 
     for(i32 x = 0; x < count; x++) {
         for(i32 y = 0; y < count; y++) {
@@ -136,7 +141,6 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
     SDL_RenderDrawPoints(renderer, point_buffer, point_count);
 
     free(point_buffer);
-    // delete[] point_buffer;
 }
 
 global_variable b32 increase_snake_cell_count = false;
@@ -150,14 +154,30 @@ global_variable       u32 flash_counter = 0;
 global_variable b32 draw_snake = true;
 
 internal void
+randomize_fruit_pos() {
+    b32 success = false;
+    Position new_pos;
+    while(!success) {
+        success=true;
+        new_pos.x = rand() % grid_size;
+        new_pos.y = rand() % grid_size;
+        for(i32 i = 0; i < snake_cell_count; i++) {
+            if(new_pos.x == positions[i].x && new_pos.y == positions[i].y) {
+                success=false;
+            }
+        }
+    }
+    fruit_pos = new_pos;
+}
+
+internal void
 reset_state() {
     collided = false;
 
     snake_pos.x = rand() % grid_size;
     snake_pos.y = rand() % grid_size;
 
-    fruit_pos.x = rand() % grid_size;
-    fruit_pos.y = rand() % grid_size;
+    randomize_fruit_pos();
 
     for(i32 i = 0; i < max_cell_count; i++) {
         auto& rect = rects[i];
@@ -175,10 +195,12 @@ reset_state() {
     snake_cell_count = 3;
     flash_counter = 0;
     draw_snake = true;
+    frame_time = start_frame_time;
 }
 
 internal void
 reset_routine() {
+    frame_time = start_frame_time;
     if(flash_counter < flash_count) {
         if(flash_counter % 2 == 0) {
             draw_snake = false;
@@ -217,17 +239,6 @@ game_loop() {
         break;
     }
 
-    if(increase_snake_cell_count) {
-        snake_cell_count = glm::min(++snake_cell_count, max_cell_count);
-    } else if(decrease_snake_cell_count) {
-        snake_cell_count = glm::max(--snake_cell_count, 0);
-    }
-
-    for(i32 i = 1; i < snake_cell_count; i++) {
-        positions[i].x = positions_last_frame[i-1].x;
-        positions[i].y = positions_last_frame[i-1].y;
-    }
-
     {
         i32 new_value;
         switch(direction) {
@@ -250,6 +261,18 @@ game_loop() {
         }
     }
 
+    if(snake_pos.x == fruit_pos.x && snake_pos.y == fruit_pos.y) {
+        frame_time = glm::max(min_frame_time, frame_time * speed_up_rate);
+        snake_cell_count = glm::min(++snake_cell_count, max_cell_count);
+        randomize_fruit_pos();
+    }
+
+    for(i32 i = 1; i < snake_cell_count; i++) {
+        positions[i].x = positions_last_frame[i-1].x;
+        positions[i].y = positions_last_frame[i-1].y;
+    }
+
+
     for(i32 i = 1; i < snake_cell_count; i++) {
         if(snake_pos.x == positions[i].x && snake_pos.y == positions[i].y) {
             collided = true;
@@ -261,9 +284,6 @@ game_loop() {
         positions_last_frame[i].y = positions[i].y;
     }
 }
-
-global_variable b32 pressed_a = false;
-global_variable b32 pressed_s = false;
 
 i32
 main(i32 argc, char **argv) {
@@ -316,7 +336,6 @@ main(i32 argc, char **argv) {
     reset_state();
 
     b32 running = true;
-    f64 frame_time = 0.2f;
     f64 current_time = (f32)SDL_GetPerformanceCounter() /
                        (f32)SDL_GetPerformanceFrequency();
     f64 last_time = 0;
@@ -376,31 +395,8 @@ main(i32 argc, char **argv) {
                             input = INPUT_RIGHT;
                         }
                         break;
-                        case 'a': {
-                            if(!pressed_a) {
-                                pressed_a = true;
-                                decrease_snake_cell_count = true;
-                            }
-                        }
-                        break;
-                        case 's': {
-                            if(!pressed_s) {
-                                pressed_s = true;
-                                increase_snake_cell_count = true;
-                            }
-                        }
-                        break;
                     }
                 } break;
-
-                case SDL_KEYUP: {
-                    case 'a': {
-                        pressed_a = false;
-                    }
-                    case 's': {
-                        pressed_s = false;
-                    }
-                }
             }
         }
 
@@ -441,8 +437,8 @@ main(i32 argc, char **argv) {
         SDL_Rect circle_rect;
         circle_rect.w = fruit_radius*2;
         circle_rect.h = fruit_radius*2;
-        circle_rect.x = fruit_radius-2 + (fruit_pos.x*cell_width);
-        circle_rect.y = fruit_radius-2 + (fruit_pos.y*cell_height);
+        circle_rect.x = (fruit_pos.x * cell_width)+3;
+        circle_rect.y = ((grid_size-fruit_pos.y-1) * cell_height)+3;
         SDL_RenderCopy(renderer, circle_texture, 0, &circle_rect);
         }
 
