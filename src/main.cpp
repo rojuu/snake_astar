@@ -106,6 +106,39 @@ render_grid(SDL_Renderer *renderer) {
     }
 }
 
+global_variable i32 fruit_radius = (cell_width/2) -3;
+global_variable Position fruit_pos;
+
+internal void
+render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
+    v2 cur_pos;
+    v2 center = v2(px + radius, py + radius);
+
+    i32 count = (radius*2) * (radius*2);
+    i32 point_count = 0;
+    SDL_Point* point_buffer = (SDL_Point*)malloc(sizeof(SDL_Point) * count * count);
+    // SDL_Point* point_buffer = new SDL_Point[count];
+
+    for(i32 x = 0; x < count; x++) {
+        for(i32 y = 0; y < count; y++) {
+            cur_pos.x = x + px;
+            cur_pos.y = y + py;
+            i32 distance = glm::distance(cur_pos, center);
+            if(distance <= radius) {
+                auto& point = point_buffer[point_count];
+                point.x = cur_pos.x;
+                point.y = cur_pos.y;
+                ++point_count;
+            }
+        }
+    }
+
+    SDL_RenderDrawPoints(renderer, point_buffer, point_count);
+
+    free(point_buffer);
+    // delete[] point_buffer;
+}
+
 global_variable b32 increase_snake_cell_count = false;
 global_variable b32 decrease_snake_cell_count = false;
 
@@ -122,6 +155,9 @@ reset_state() {
 
     snake_pos.x = rand() % grid_size;
     snake_pos.y = rand() % grid_size;
+
+    fruit_pos.x = rand() % grid_size;
+    fruit_pos.y = rand() % grid_size;
 
     for(i32 i = 0; i < max_cell_count; i++) {
         auto& rect = rects[i];
@@ -263,6 +299,19 @@ main(i32 argc, char **argv) {
     SDL_FreeSurface(grid_surface);
     }
 
+    SDL_Texture* circle_texture;
+    {
+    SDL_Surface* circle_surface = SDL_CreateRGBSurface(0, fruit_radius*2+1, fruit_radius*2+1, 32, 0, 0, 0, 0);
+    SDL_Renderer* circle_renderer = SDL_CreateSoftwareRenderer(circle_surface);
+    SDL_SetRenderDrawColor(circle_renderer, 0, 0, 0, 0);
+    SDL_RenderClear(circle_renderer);
+    SDL_SetRenderDrawColor(circle_renderer, 255, 255, 255, 255);
+    render_circle(circle_renderer, 0, 0, fruit_radius);
+    circle_texture = SDL_CreateTextureFromSurface(renderer, circle_surface);
+    SDL_DestroyRenderer(circle_renderer);
+    SDL_FreeSurface(circle_surface);
+    }
+
     srand(time(0));
     reset_state();
 
@@ -382,9 +431,22 @@ main(i32 argc, char **argv) {
 
         SDL_RenderCopy(renderer, grid_texture, 0, 0);
 
-        if (draw_snake) {
+        {
             const i32 k = 255;
             SDL_SetRenderDrawColor(renderer, k, k, k, 255);
+        }
+
+        //Draw fruit
+        {
+        SDL_Rect circle_rect;
+        circle_rect.w = fruit_radius*2;
+        circle_rect.h = fruit_radius*2;
+        circle_rect.x = fruit_radius-2 + (fruit_pos.x*cell_width);
+        circle_rect.y = fruit_radius-2 + (fruit_pos.y*cell_height);
+        SDL_RenderCopy(renderer, circle_texture, 0, &circle_rect);
+        }
+
+        if (draw_snake) {
             SDL_RenderFillRects(renderer, rects, snake_cell_count);
         }
 
