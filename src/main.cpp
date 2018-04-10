@@ -1,27 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <math.h>
 #include <time.h>
-#include <iostream>
-#include <fstream>
-#include <string>
-#include <vector>
+#include <stdint.h>
 #include "SDL.h"
-#include "glm/glm.hpp"
-#include "glm/vec3.hpp"
-#include "glm/gtc/type_ptr.hpp"
-#include "glm/gtc/matrix_transform.hpp"
-#include <cstdint>
-#include <fstream>
-#include <string>
-
-/** TODO:
- *
- * Should we actually use windows.h rather than SDL?
- * If we'd do that, we could use some useful windows API calls.
- * Maybe still use SDL, but only use those calls for useful stuff?
- * How would I go about portability in a situation like that?
- *
-**/
 
 #define internal static
 #define global_variable static
@@ -46,22 +28,45 @@ typedef i16 b16;
 typedef i32 b32;
 typedef i64 b64;
 
-typedef glm::vec2 v2;
-typedef glm::vec3 v3;
-typedef glm::vec4 v4;
-
-typedef glm::mat2 m2;
-typedef glm::mat3 m3;
-typedef glm::mat4 m4;
-
-global_variable const f32 PI = glm::pi<f32>();
-
 global_variable const i32 SCREEN_WIDTH = 256;
 global_variable const i32 SCREEN_HEIGHT = 256;
 
-struct Position {
+typedef struct {
     i32 x, y;
-};
+} 
+v2;
+
+internal i32
+distance(v2 a, v2 b) {
+    i32 diff_x = b.x - a.x;
+    i32 diff_y = b.y - a.y;
+    i32 result = sqrt(diff_x*diff_x + diff_y*diff_y);
+    return result;
+}
+
+inline i32
+max(i32 a, i32 b) {
+    i32 result = a > b ? a : b;
+    return result;
+}
+
+inline f64
+max(f64 a, f64 b) {
+    f64 result = a > b ? a : b;
+    return result;
+}
+
+inline i32
+min(i32 a, i32 b) {
+    i32 result = a < b ? a : b;
+    return result;
+}
+
+inline f64
+min(f64 a, f64 b) {
+    f64 result = a < b ? a : b;
+    return result;
+}
 
 enum INPUT_E {
     INPUT_UP,
@@ -92,9 +97,9 @@ global_variable f64 frame_time;
 
 global_variable i32 snake_cell_count;
 global_variable i32 input;
-global_variable Position positions[max_cell_count];
-global_variable Position positions_last_frame[max_cell_count];
-global_variable Position& snake_pos = positions[0];
+global_variable v2 positions[max_cell_count];
+global_variable v2 positions_last_frame[max_cell_count];
+global_variable v2& snake_pos = positions[0];
 global_variable SDL_Rect rects[max_cell_count];
 global_variable i32 direction = DIRECTION_RIGHT;
 
@@ -113,12 +118,12 @@ render_grid(SDL_Renderer *renderer) {
 }
 
 global_variable i32 fruit_radius = (cell_width/2) -3;
-global_variable Position fruit_pos;
+global_variable v2 fruit_pos;
 
 internal void
 render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
     v2 cur_pos;
-    v2 center = v2(px + radius, py + radius);
+    v2 center = {px + radius, py + radius};
 
     i32 count = (radius*2) * (radius*2);
     i32 point_count = 0;
@@ -128,8 +133,8 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
         for(i32 y = 0; y < count; y++) {
             cur_pos.x = x + px;
             cur_pos.y = y + py;
-            i32 distance = glm::distance(cur_pos, center);
-            if(distance <= radius) {
+            i32 dist = distance(cur_pos, center);
+            if(dist <= radius) {
                 auto& point = point_buffer[point_count];
                 point.x = cur_pos.x;
                 point.y = cur_pos.y;
@@ -156,7 +161,7 @@ global_variable b32 draw_snake = true;
 internal void
 randomize_fruit_pos() {
     b32 success = false;
-    Position new_pos;
+    v2 new_pos;
     while(!success) {
         success=true;
         new_pos.x = rand() % grid_size;
@@ -262,8 +267,8 @@ game_loop() {
     }
 
     if(snake_pos.x == fruit_pos.x && snake_pos.y == fruit_pos.y) {
-        frame_time = glm::max(min_frame_time, frame_time * speed_up_rate);
-        snake_cell_count = glm::min(++snake_cell_count, max_cell_count);
+        frame_time = max(min_frame_time, frame_time * speed_up_rate);
+        snake_cell_count = min(++snake_cell_count, max_cell_count);
         randomize_fruit_pos();
     }
 

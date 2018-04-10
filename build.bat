@@ -6,9 +6,7 @@ set SDL2=%CD%\libs\SDL2-2.0.5
 set SDL_INC=%SDL2%\include
 set SDL_LIB=%SDL2%\lib\%TARGET%
 
-set GLM_INC=%CD%\libs\glm-0.9.8.4\glm
-
-set CommonCompilerFlags=/Zi /Za /Od /EHsc /nologo /FC /I%SDL_INC% /I%GLM_INC%
+set CommonCompilerFlags=/Zi /Od /EHsc /nologo /FC /I%SDL_INC% 
 
 set CommonLinkerFlags=/DEBUG /LIBPATH:%SDL_LIB% SDL2.lib SDL2main.lib
 
