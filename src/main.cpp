@@ -244,26 +244,48 @@ game_loop() {
         break;
     }
 
-    {
-        i32 new_value;
-        switch(direction) {
-            case DIRECTION_UP:
-                new_value = ++snake_pos.y;
-                snake_pos.y = new_value % grid_size;
-            break;
-            case DIRECTION_DOWN:
-                new_value = --snake_pos.y;
-                snake_pos.y = new_value < 0 ? grid_size-1 : new_value;
-            break;
-            case DIRECTION_LEFT:
-                new_value = --snake_pos.x;
-                snake_pos.x = new_value < 0 ? grid_size-1 : new_value;
-            break;
-            case DIRECTION_RIGHT:
-                new_value = ++snake_pos.x;
-                snake_pos.x = new_value % grid_size;
-            break;
+    switch(direction) {
+        case DIRECTION_UP:
+            ++snake_pos.y;
+        break;
+        case DIRECTION_DOWN:
+            --snake_pos.y;
+        break;
+        case DIRECTION_LEFT:
+            --snake_pos.x;
+        break;
+        case DIRECTION_RIGHT:
+            ++snake_pos.x;
+        break;
+    }
+
+    for(i32 i = 1; i < snake_cell_count; i++) {
+        if(snake_pos.x == positions[i].x && snake_pos.y == positions[i].y) {
+            collided = true;
         }
+    }
+
+    b32 edge_collision = false;
+    if(direction == DIRECTION_RIGHT && snake_pos.x >= grid_size) {
+        edge_collision = true;
+        --snake_pos.x;
+    }
+    if (direction == DIRECTION_LEFT && snake_pos.x < 0) {
+        edge_collision = true;
+        ++snake_pos.x;
+    }
+    if (direction == DIRECTION_UP && snake_pos.y >= grid_size) {
+        edge_collision = true;
+        --snake_pos.y;
+    }
+    if (direction == DIRECTION_DOWN && snake_pos.y < 0) {
+        edge_collision = true;
+        ++snake_pos.y;
+    }
+
+    if(edge_collision) {
+        collided = true;
+        return;
     }
 
     if(snake_pos.x == fruit_pos.x && snake_pos.y == fruit_pos.y) {
@@ -278,16 +300,69 @@ game_loop() {
     }
 
 
-    for(i32 i = 1; i < snake_cell_count; i++) {
-        if(snake_pos.x == positions[i].x && snake_pos.y == positions[i].y) {
-            collided = true;
-        }
-    }
-
     for(i32 i = 0; i < snake_cell_count; i++) {
         positions_last_frame[i].x = positions[i].x;
         positions_last_frame[i].y = positions[i].y;
     }
+}
+
+global_variable SDL_Texture* grid_texture;
+global_variable SDL_Texture* circle_texture;
+
+void
+render_loop(SDL_Renderer* renderer) {
+    for(i32 i = 0; i < snake_cell_count; i++) {
+        auto& rect = rects[i];
+        auto& position = positions[i];
+        rect.x = position.x * cell_width;
+        rect.y = (grid_size - position.y - 1) * cell_height;
+    }
+
+    //TODO: Render with OpenGL to get Vsync, so we don't hog all the cpu resources?
+    // We could still use SDL rendering functions for the actual drawing and just send the texture to OpenGL
+
+    SDL_RenderCopy(renderer, grid_texture, 0, 0);
+
+    {
+        const i32 k = 255;
+        SDL_SetRenderDrawColor(renderer, k, k, k, 255);
+    }
+
+    //Draw fruit
+    {
+        SDL_Rect circle_rect;
+        circle_rect.w = fruit_radius*2;
+        circle_rect.h = fruit_radius*2;
+        circle_rect.x = (fruit_pos.x * cell_width)+3;
+        circle_rect.y = ((grid_size-fruit_pos.y-1) * cell_height)+3;
+        SDL_RenderCopy(renderer, circle_texture, 0, &circle_rect);
+    }
+
+    if (draw_snake) {
+        SDL_RenderFillRects(renderer, rects, snake_cell_count);
+    }
+
+    SDL_RenderPresent(renderer);
+}
+
+void
+init_renderer(SDL_Renderer* renderer) {
+    SDL_Surface* grid_surface = SDL_CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32, 0, 0, 0, 0);
+    SDL_Renderer* grid_renderer = SDL_CreateSoftwareRenderer(grid_surface);
+    render_grid(grid_renderer);
+    grid_texture = SDL_CreateTextureFromSurface(renderer, grid_surface);
+    SDL_DestroyRenderer(grid_renderer);
+    SDL_FreeSurface(grid_surface);
+
+    SDL_Surface* circle_surface = SDL_CreateRGBSurface(0, fruit_radius*2+1, fruit_radius*2+1, 32, 0, 0, 0, 0);
+    SDL_Renderer* circle_renderer = SDL_CreateSoftwareRenderer(circle_surface);
+    SDL_SetRenderDrawColor(circle_renderer, 0, 0, 0, 0);
+    SDL_RenderClear(circle_renderer);
+    SDL_SetRenderDrawColor(circle_renderer, 255, 255, 255, 255);
+    render_circle(circle_renderer, 0, 0, fruit_radius);
+    circle_texture = SDL_CreateTextureFromSurface(renderer, circle_surface);
+    SDL_DestroyRenderer(circle_renderer);
+    SDL_FreeSurface(circle_surface);
 }
 
 i32
@@ -314,28 +389,7 @@ main(i32 argc, char **argv) {
         return -1;
     }
 
-    SDL_Texture* grid_texture;
-    {
-    SDL_Surface* grid_surface = SDL_CreateRGBSurface(0, SCREEN_WIDTH, SCREEN_HEIGHT, 32, 0, 0, 0, 0);
-    SDL_Renderer* grid_renderer = SDL_CreateSoftwareRenderer(grid_surface);
-    render_grid(grid_renderer);
-    grid_texture = SDL_CreateTextureFromSurface(renderer, grid_surface);
-    SDL_DestroyRenderer(grid_renderer);
-    SDL_FreeSurface(grid_surface);
-    }
-
-    SDL_Texture* circle_texture;
-    {
-    SDL_Surface* circle_surface = SDL_CreateRGBSurface(0, fruit_radius*2+1, fruit_radius*2+1, 32, 0, 0, 0, 0);
-    SDL_Renderer* circle_renderer = SDL_CreateSoftwareRenderer(circle_surface);
-    SDL_SetRenderDrawColor(circle_renderer, 0, 0, 0, 0);
-    SDL_RenderClear(circle_renderer);
-    SDL_SetRenderDrawColor(circle_renderer, 255, 255, 255, 255);
-    render_circle(circle_renderer, 0, 0, fruit_radius);
-    circle_texture = SDL_CreateTextureFromSurface(renderer, circle_surface);
-    SDL_DestroyRenderer(circle_renderer);
-    SDL_FreeSurface(circle_surface);
-    }
+    init_renderer(renderer);
 
     srand(time(0));
     reset_state();
@@ -405,7 +459,6 @@ main(i32 argc, char **argv) {
             }
         }
 
-        //Update game logic
         if(current_time >= (last_update_time + frame_time)) {
             last_update_time = current_time;
             if(!collided) {
@@ -416,42 +469,7 @@ main(i32 argc, char **argv) {
             }
         }
 
-        //Update positions for rendering
-        for(i32 i = 0; i < snake_cell_count; i++) {
-            auto& rect = rects[i];
-            auto& position = positions[i];
-            rect.x = position.x * cell_width;
-            rect.y = (grid_size - position.y - 1) * cell_height;
-        }
-
-        //Rendering
-        //TODO: Render with OpenGL to get Vsync, so we don't hog all the cpu resources?
-        // We could still use SDL rendering functions for the actual drawing and just send the texture to OpenGL
-        SDL_SetRenderDrawColor(renderer, 0, 0, 0, 255);
-        SDL_RenderClear(renderer);
-
-        SDL_RenderCopy(renderer, grid_texture, 0, 0);
-
-        {
-            const i32 k = 255;
-            SDL_SetRenderDrawColor(renderer, k, k, k, 255);
-        }
-
-        //Draw fruit
-        {
-        SDL_Rect circle_rect;
-        circle_rect.w = fruit_radius*2;
-        circle_rect.h = fruit_radius*2;
-        circle_rect.x = (fruit_pos.x * cell_width)+3;
-        circle_rect.y = ((grid_size-fruit_pos.y-1) * cell_height)+3;
-        SDL_RenderCopy(renderer, circle_texture, 0, &circle_rect);
-        }
-
-        if (draw_snake) {
-            SDL_RenderFillRects(renderer, rects, snake_cell_count);
-        }
-
-        SDL_RenderPresent(renderer);
+        render_loop(renderer);
     }
 
     SDL_DestroyWindow(window);
