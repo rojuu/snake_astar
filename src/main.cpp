@@ -3,9 +3,11 @@
 #include <math.h>
 #include <time.h>
 #include <stdint.h>
+#include <vector> 
 #include "SDL.h"
 
 #define internal static
+#define global_variable static
 
 #define array_count(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 
@@ -149,6 +151,81 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
 
     free(point_buffer);
 }
+
+internal void //needs return value
+reconstruct_path(v2 cameFrom, v2 current) {
+}
+
+internal void //needs return value
+a_star(Game& game, v2 start, v2 goal) {
+    i32 max_count = game.grid_size*game.grid_size;
+    auto closed_set = std::vector<v2>(max_count);
+    auto open_set = std::vector<v2>(max_count);
+}
+
+// https://www.raywenderlich.com/4946/introduction-to-a-pathfinding
+/*
+function A*(start, goal)
+    // The set of nodes already evaluated
+    closedSet := {}
+
+    // The set of currently discovered nodes that are not evaluated yet.
+    // Initially, only the start node is known.
+    openSet := {start}
+
+    // For each node, which node it can most efficiently be reached from.
+    // If a node can be reached from many nodes, cameFrom will eventually contain the
+    // most efficient previous step.
+    cameFrom := an empty map
+
+    // For each node, the cost of getting from the start node to that node.
+    gScore := map with default value of Infinity
+
+    // The cost of going from start to start is zero.
+    gScore[start] := 0
+
+    // For each node, the total cost of getting from the start node to the goal
+    // by passing by that node. That value is partly known, partly heuristic.
+    fScore := map with default value of Infinity
+
+    // For the first node, that value is completely heuristic.
+    fScore[start] := heuristic_cost_estimate(start, goal)
+
+    while openSet is not empty
+        current := the node in openSet having the lowest fScore[] value
+        if current = goal
+            return reconstruct_path(cameFrom, current)
+
+        openSet.Remove(current)
+        closedSet.Add(current)
+
+        for each neighbor of current
+            if neighbor in closedSet
+                continue		// Ignore the neighbor which is already evaluated.
+
+            if neighbor not in openSet	// Discover a new node
+                openSet.Add(neighbor)
+            
+            // The distance from start to a neighbor
+            //the "dist_between" function may vary as per the solution requirements.
+            tentative_gScore := gScore[current] + dist_between(current, neighbor)
+            if tentative_gScore >= gScore[neighbor]
+                continue		// This is not a better path.
+
+            // This path is the best until now. Record it!
+            cameFrom[neighbor] := current
+            gScore[neighbor] := tentative_gScore
+            fScore[neighbor] := gScore[neighbor] + heuristic_cost_estimate(neighbor, goal) 
+
+    return failure
+
+function reconstruct_path(cameFrom, current)
+    total_path := [current]
+    while current in cameFrom.Keys:
+        current := cameFrom[current]
+        total_path.append(current)
+    return total_path
+*/
 
 internal void
 randomize_fruit_pos(Game& game) {
@@ -475,7 +552,8 @@ main(i32 argc, char **argv) {
                         }
                         break;
                     }
-                } break;
+                }
+                break;
             }
         }
 
