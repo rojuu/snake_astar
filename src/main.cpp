@@ -11,6 +11,11 @@
 
 #define array_count(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 
+
+/** TODO: 
+  -Don't hog all the resources and run at 9001 FPS all the time.
+*/
+
 typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;
@@ -386,9 +391,6 @@ render_loop(SDL_Renderer* renderer, Rendering& rendering, Game& game) {
         rect.x = position.x * rendering.cell_width;
         rect.y = (game.grid_size - position.y - 1) * rendering.cell_height;
     }
-
-    //TODO: Render with OpenGL to get Vsync, so we don't hog all the cpu resources?
-    // We could still use SDL rendering functions for the actual drawing and just send the texture to OpenGL
 
     SDL_RenderCopy(renderer, rendering.grid_texture, 0, 0);
 
