@@ -19,6 +19,6 @@ if not exist SDL2.dll (
     robocopy %SDL_LIB% . SDL2.dll
 )
 
-cl %CommonCompilerFlags% ..\src\main.cpp /link /subsystem:console %CommonLinkerFlags% /out:snake_astar.exe
+cl %CommonCompilerFlags% ..\src\main.cpp /link /subsystem:windows %CommonLinkerFlags% /out:snake_astar.exe
 popd
 echo Done

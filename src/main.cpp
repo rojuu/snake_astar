@@ -6,6 +6,9 @@
 #include <vector> 
 #include "SDL.h"
 
+#include <assert.h>
+#include <windows.h>
+
 #define internal static
 #define global_variable static
 
@@ -68,35 +71,11 @@ struct Game {
     u32 flash_counter;
 };
 
-internal i32
+internal f32
 distance(v2 a, v2 b) {
-    i32 diff_x = b.x - a.x;
-    i32 diff_y = b.y - a.y;
-    i32 result = sqrt(diff_x*diff_x + diff_y*diff_y);
-    return result;
-}
-
-inline i32
-max(i32 a, i32 b) {
-    i32 result = a > b ? a : b;
-    return result;
-}
-
-inline f64
-max(f64 a, f64 b) {
-    f64 result = a > b ? a : b;
-    return result;
-}
-
-inline i32
-min(i32 a, i32 b) {
-    i32 result = a < b ? a : b;
-    return result;
-}
-
-inline f64
-min(f64 a, f64 b) {
-    f64 result = a < b ? a : b;
+    f32 diff_x = b.x - a.x;
+    f32 diff_y = b.y - a.y;
+    f32 result = sqrt(diff_x*diff_x + diff_y*diff_y);
     return result;
 }
 
@@ -157,18 +136,64 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
     free(point_buffer);
 }
 
-internal void //needs return value
-reconstruct_path(v2 cameFrom, v2 current) {
+struct AstarScores {
+    f32 G;
+    f32 H;
+};
+
+inline f32
+astar_heuristic(v2 pos, v2 goal) {
+    return distance(pos, goal);
 }
 
 internal void //needs return value
-a_star(Game& game, v2 start, v2 goal) {
+astar(Game& game, v2 start, v2 goal) {
     i32 max_count = game.grid_size*game.grid_size;
-    auto closed_set = std::vector<v2>(max_count);
-    auto open_set = std::vector<v2>(max_count);
+    auto closed_set_positions = std::vector<v2>(max_count);
+    auto closed_set_scores = std::vector<AstarScores>(max_count);
+    auto open_set_positions = std::vector<v2>(max_count);
+    auto open_set_scores = std::vector<AstarScores>(max_count);
+
+    v2 current_pos = start;
+    AstarScores current_score;
 }
 
 // https://www.raywenderlich.com/4946/introduction-to-a-pathfinding
+/*
+[openList add:originalSquare]; // start by adding the original position to the open list
+do {
+	currentSquare = [openList squareWithLowestFScore]; // Get the square with the lowest F score
+	
+	[closedList add:currentSquare]; // add the current square to the closed list
+	[openList remove:currentSquare]; // remove it to the open list
+	
+	if ([closedList contains:destinationSquare]) { // if we added the destination to the closed list, we've found a path
+		// PATH FOUND
+		break; // break the loop
+	}
+	
+	adjacentSquares = [currentSquare walkableAdjacentSquares]; // Retrieve all its walkable adjacent squares
+	
+	foreach (aSquare in adjacentSquares) {
+		
+		if ([closedList contains:aSquare]) { // if this adjacent square is already in the closed list ignore it
+			continue; // Go to the next adjacent square
+		}
+		
+		if (![openList contains:aSquare]) { // if its not in the open list
+			
+			// compute its score, set the parent
+			[openList add:aSquare]; // and add it to the open list
+			
+		} else { // if its already in the open list
+			
+			// test if using the current G score make the aSquare F score lower, if yes update the parent because it means its a better path
+			
+		}
+	}
+	
+} while(![openList isEmpty]); // Continue until there is no more available square in the open list (which means there is no path)
+*/
 /*
 function A*(start, goal)
     // The set of nodes already evaluated
@@ -441,7 +466,8 @@ i32
 main(i32 argc, char **argv) {
     // Init SDL stuff
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
-        printf("SDL_Error: %s\n", SDL_GetError());
+        const char* error = SDL_GetError();
+        assert("SDL_Error" == 0);
         return -1;
     }
     atexit(SDL_Quit);
@@ -484,7 +510,8 @@ main(i32 argc, char **argv) {
         window, -1, SDL_RENDERER_ACCELERATED);
 
     if (!window || !renderer) {
-        printf("SDL_Error: %s\n", SDL_GetError());
+        const char* error = SDL_GetError();
+        assert("SDL_Error" == 0);
         return -1;
     }
 
