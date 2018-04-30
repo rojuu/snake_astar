@@ -4,6 +4,7 @@
 #include <time.h>
 #include <stdint.h>
 #include <vector> 
+#include <algorithm>
 #include "SDL.h"
 
 #include <assert.h>
@@ -40,6 +41,16 @@ typedef i64 b64;
 struct v2 {
     i32 x, y;
 };
+
+inline bool
+operator==(const v2& lhs, const v2& rhs) {
+    return lhs.x == rhs.x && lhs.y == rhs.y;
+}
+
+inline bool
+operator!=(const v2& lhs, const v2& rhs) {
+    return !(lhs == rhs);
+}
 
 struct Rendering {
     i32 screen_width;
@@ -137,25 +148,81 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
 }
 
 struct AstarScores {
-    f32 G;
-    f32 H;
+    i32 G;
+    i32 H;
 };
 
-inline f32
+inline i32
+f_score(AstarScores score) {
+    return score.G + score.H;
+}
+
+internal i32
+find_lowest_fscore_index(AstarScores *scores, i32 count) {
+    i32 best_index = 0;
+    i32 lowest_F = f_score(scores[0]);
+
+    for(i32 i = 1; i < count; i++) {
+        i32 F = f_score(scores[i]);
+        if(F < lowest_F) {
+            best_index = i;
+        }
+    }
+
+    return best_index;
+}
+
+inline i32
 astar_heuristic(v2 pos, v2 goal) {
-    return distance(pos, goal);
+    return (i32)distance(pos, goal);
+}
+
+inline b32
+check_walkable_cell(v2 pos, v2* positions, i32 positions_count) {
+    for(i32 i = 0; i < positions_count; i++) {
+        v2 test_pos = positions[i];
+        if(pos.x == test_pos.x && pos.y == test_pos.y) {
+            return false;
+        }
+    }
+    return true;
+}
+
+internal i32
+find_walkable_adjacent_cells(v2 current_cell, v2* result_buffer,
+                             v2* positions, i32 positions_count
+) {
 }
 
 internal void //needs return value
 astar(Game& game, v2 start, v2 goal) {
+    //TODO: are sets better than vectors for this?
     i32 max_count = game.grid_size*game.grid_size;
-    auto closed_set_positions = std::vector<v2>(max_count);
-    auto closed_set_scores = std::vector<AstarScores>(max_count);
-    auto open_set_positions = std::vector<v2>(max_count);
-    auto open_set_scores = std::vector<AstarScores>(max_count);
+    auto closed_set_pos = std::vector<v2>(max_count);
+    auto closed_set_scr = std::vector<AstarScores>(max_count);
+    auto open_set_pos = std::vector<v2>(max_count);
+    auto open_set_scr = std::vector<AstarScores>(max_count);
 
     v2 current_pos = start;
-    AstarScores current_score;
+
+    AstarScores current_scr;
+    current_scr.G = 0;
+    current_scr.H = astar_heuristic(start, goal);
+
+    closed_set_pos.push_back(current_pos);
+    closed_set_scr.push_back(current_scr);
+
+    do {
+        i32 current_index = find_lowest_fscore_index(&open_set_scr[0], open_set_scr.size());
+        closed_set_pos.push_back(open_set_pos[current_index]);
+        closed_set_scr.push_back(open_set_scr[current_index]);
+        open_set_pos.erase(open_set_pos.begin() + current_index);
+        open_set_scr.erase(open_set_scr.begin() + current_index);
+        if(std::find(closed_set_pos.begin(), closed_set_pos.end(), goal) != closed_set_pos.end()) {
+            //Found path
+            break;
+        }
+    } while(!open_set_pos.empty());
 }
 
 // https://www.raywenderlich.com/4946/introduction-to-a-pathfinding
