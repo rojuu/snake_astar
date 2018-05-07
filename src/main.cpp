@@ -54,8 +54,8 @@ operator!=(const Vec2& lhs, const Vec2& rhs) {
 }
 
 template<typename T> inline b32
-contains(std::vector<T>& vec, T val) {
-    return std::find(vec.begin(), vec.end(), val) != vec.end();
+contains(std::vector<T>* vec, T val) {
+    return std::find(vec->begin(), vec->end(), val) != vec->end();
 }
 
 struct Rendering {
@@ -104,19 +104,18 @@ enum Direction {
 };
 
 internal void
-render_grid(SDL_Renderer *renderer, Rendering& rendering) {
+render_grid(SDL_Renderer *renderer, Rendering* rendering) {
     const i32 k = 64;
     SDL_SetRenderDrawColor(renderer, k, k, k, 128);
-    for(i32 i = rendering.cell_width; i < rendering.screen_width; i+=rendering.cell_width) {
-        SDL_RenderDrawLine(renderer, i, 0, i, rendering.screen_height);
-        SDL_RenderDrawLine(renderer, i-1, 0, i-1, rendering.screen_height);
+    for(i32 i = rendering->cell_width; i < rendering->screen_width; i+=rendering->cell_width) {
+        SDL_RenderDrawLine(renderer, i, 0, i, rendering->screen_height);
+        SDL_RenderDrawLine(renderer, i-1, 0, i-1, rendering->screen_height);
     }
-    for(i32 i = rendering.cell_width; i < rendering.screen_height; i+=rendering.cell_width) {
-        SDL_RenderDrawLine(renderer, 0, i, rendering.screen_width, i);
-        SDL_RenderDrawLine(renderer, 0, i-1, rendering.screen_width, i-1);
+    for(i32 i = rendering->cell_width; i < rendering->screen_height; i+=rendering->cell_width) {
+        SDL_RenderDrawLine(renderer, 0, i, rendering->screen_width, i);
+        SDL_RenderDrawLine(renderer, 0, i-1, rendering->screen_width, i-1);
     }
 }
-
 
 internal void
 render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
@@ -133,9 +132,9 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
             cur_pos.y = y + py;
             i32 dist = distance(cur_pos, center);
             if(dist <= radius) {
-                auto& point = point_buffer[point_count];
-                point.x = cur_pos.x;
-                point.y = cur_pos.y;
+                auto* point = &point_buffer[point_count];
+                point->x = cur_pos.x;
+                point->y = cur_pos.y;
                 ++point_count;
             }
         }
@@ -194,9 +193,9 @@ find_walkable_adjacent_cells(Vec2 current_cell, Vec2* result_buffer,
 }
 
 internal void //needs return value
-astar(Game& game, Vec2 start, Vec2 goal) {
+astar(Game* game, Vec2 start, Vec2 goal) {
     //TODO: are sets better than vectors for this?
-    i32 max_count = game.grid_size*game.grid_size;
+    i32 max_count = game->grid_size*game->grid_size;
     auto closed_set_pos = std::vector<Vec2>(max_count);// std::vector<Vec2>(max_count);
     auto closed_set_scr = std::vector<AstarScores>(max_count);
     auto open_set_pos = std::vector<Vec2>(max_count);
@@ -218,7 +217,7 @@ astar(Game& game, Vec2 start, Vec2 goal) {
         open_set_pos.erase(open_set_pos.begin() + current_index);
         open_set_scr.erase(open_set_scr.begin() + current_index);
 
-        if(contains(closed_set_pos, goal)) {
+        if(contains(&closed_set_pos, goal)) {
             //Found path
             break;
         }
@@ -325,167 +324,167 @@ function reconstruct_path(cameFrom, current)
 */
 
 internal void
-randomize_fruit_pos(Game& game) {
+randomize_fruit_pos(Game* game) {
     b32 success = false;
     Vec2 new_pos;
     while(!success) {
         success=true;
-        new_pos.x = rand() % game.grid_size;
-        new_pos.y = rand() % game.grid_size;
-        for(i32 i = 0; i < game.snake_cell_count; i++) {
-            if(new_pos.x == game.positions[i].x && new_pos.y == game.positions[i].y) {
+        new_pos.x = rand() % game->grid_size;
+        new_pos.y = rand() % game->grid_size;
+        for(i32 i = 0; i < game->snake_cell_count; i++) {
+            if(new_pos.x == game->positions[i].x && new_pos.y == game->positions[i].y) {
                 success=false;
             }
         }
     }
-    game.fruit_pos = new_pos;
+    game->fruit_pos = new_pos;
 }
 
 internal void
-reset_state(Game& game, Rendering& rendering) {
-    game.collided = false;
+reset_state(Game* game, Rendering* rendering) {
+    game->collided = false;
 
-    auto& snake_pos = game.positions[0];
-    snake_pos.x = rand() % game.grid_size;
-    snake_pos.y = rand() % game.grid_size;
+    auto* snake_pos = game->positions;
+    snake_pos->x = rand() % game->grid_size;
+    snake_pos->y = rand() % game->grid_size;
 
     randomize_fruit_pos(game);
 
-    for(i32 i = 0; i < game.max_cell_count; i++) {
-        auto& rect = rendering.rects[i];
-        auto& pos = game.positions[i];
+    for(i32 i = 0; i < game->max_cell_count; i++) {
+        auto* rect = &rendering->rects[i];
+        auto* pos = &game->positions[i];
 
-        rect.w = rendering.cell_width;
-        rect.h = rendering.cell_height;
-        pos.x = snake_pos.x;
-        pos.y = snake_pos.y;
+        rect->w = rendering->cell_width;
+        rect->h = rendering->cell_height;
+        pos->x = snake_pos->x;
+        pos->y = snake_pos->y;
 
-        game.positions_last_frame[i] = pos;
+        game->positions_last_frame[i] = *pos;
     }
 
-    game.input = -1;
-    game.snake_cell_count = 3;
-    game.flash_counter = 0;
-    rendering.draw_snake = true;
-    game.frame_time = game.start_frame_time;
+    game->input = -1;
+    game->snake_cell_count = 3;
+    game->flash_counter = 0;
+    rendering->draw_snake = true;
+    game->frame_time = game->start_frame_time;
 }
 
 internal void
-reset_routine(Game& game, Rendering& rendering) {
-    game.frame_time = game.start_frame_time;
-    if(game.flash_counter < game.flash_count) {
-        if(game.flash_counter % 2 == 0) {
-            rendering.draw_snake = false;
+reset_routine(Game* game, Rendering* rendering) {
+    game->frame_time = game->start_frame_time;
+    if(game->flash_counter < game->flash_count) {
+        if(game->flash_counter % 2 == 0) {
+            rendering->draw_snake = false;
         } else {
-            rendering.draw_snake = true;
+            rendering->draw_snake = true;
         }
 
-        ++game.flash_counter;
+        ++game->flash_counter;
     } else {
         reset_state(game, rendering);
     }
 }
 
 internal void
-game_loop(Game& game) {
-    auto& snake_pos = game.positions[0];
+game_loop(Game* game) {
+    auto* snake_pos = game->positions;
 
-    switch(game.input) {
+    switch(game->input) {
         case UP:
-            if(game.direction == RIGHT || game.direction == LEFT) {
-                game.direction = UP;
+            if(game->direction == RIGHT || game->direction == LEFT) {
+                game->direction = UP;
             }
         break;
         case DOWN:
-            if(game.direction == RIGHT || game.direction == LEFT) {
-                game.direction = DOWN;
+            if(game->direction == RIGHT || game->direction == LEFT) {
+                game->direction = DOWN;
             }
         break;
         case RIGHT:
-            if(game.direction == UP || game.direction == DOWN) {
-                game.direction = RIGHT;
+            if(game->direction == UP || game->direction == DOWN) {
+                game->direction = RIGHT;
             }
         break;
         case LEFT:
-            if(game.direction == UP || game.direction == DOWN) {
-                game.direction = LEFT;
+            if(game->direction == UP || game->direction == DOWN) {
+                game->direction = LEFT;
             }
         break;
     }
 
-    switch(game.direction) {
+    switch(game->direction) {
         case UP:
-            ++snake_pos.y;
+            ++snake_pos->y;
         break;
         case DOWN:
-            --snake_pos.y;
+            --snake_pos->y;
         break;
         case LEFT:
-            --snake_pos.x;
+            --snake_pos->x;
         break;
         case RIGHT:
-            ++snake_pos.x;
+            ++snake_pos->x;
         break;
     }
 
-    for(i32 i = 1; i < game.snake_cell_count; i++) {
-        if(snake_pos.x == game.positions[i].x && snake_pos.y == game.positions[i].y) {
-            game.collided = true;
+    for(i32 i = 1; i < game->snake_cell_count; i++) {
+        if(snake_pos->x == game->positions[i].x && snake_pos->y == game->positions[i].y) {
+            game->collided = true;
         }
     }
 
     b32 edge_collision = false;
-    if(game.direction == RIGHT && snake_pos.x >= game.grid_size) {
+    if(game->direction == RIGHT && snake_pos->x >= game->grid_size) {
         edge_collision = true;
-        --snake_pos.x;
+        --snake_pos->x;
     }
-    if (game.direction == LEFT && snake_pos.x < 0) {
+    if (game->direction == LEFT && snake_pos->x < 0) {
         edge_collision = true;
-        ++snake_pos.x;
+        ++snake_pos->x;
     }
-    if (game.direction == UP && snake_pos.y >= game.grid_size) {
+    if (game->direction == UP && snake_pos->y >= game->grid_size) {
         edge_collision = true;
-        --snake_pos.y;
+        --snake_pos->y;
     }
-    if (game.direction == DOWN && snake_pos.y < 0) {
+    if (game->direction == DOWN && snake_pos->y < 0) {
         edge_collision = true;
-        ++snake_pos.y;
+        ++snake_pos->y;
     }
 
     if(edge_collision) {
-        game.collided = true;
+        game->collided = true;
         return;
     }
 
-    if(snake_pos.x == game.fruit_pos.x && snake_pos.y == game.fruit_pos.y) {
-        game.frame_time = max(game.min_frame_time, game.frame_time * game.speed_up_rate);
-        i32 increment = game.snake_cell_count + 1;
-        game.snake_cell_count = min(increment, game.max_cell_count);
+    if(snake_pos->x == game->fruit_pos.x && snake_pos->y == game->fruit_pos.y) {
+        game->frame_time = max(game->min_frame_time, game->frame_time * game->speed_up_rate);
+        i32 increment = game->snake_cell_count + 1;
+        game->snake_cell_count = min(increment, game->max_cell_count);
         randomize_fruit_pos(game);
     }
 
-    for(i32 i = 1; i < game.snake_cell_count; i++) {
-        game.positions[i].x = game.positions_last_frame[i-1].x;
-        game.positions[i].y = game.positions_last_frame[i-1].y;
+    for(i32 i = 1; i < game->snake_cell_count; i++) {
+        game->positions[i].x = game->positions_last_frame[i-1].x;
+        game->positions[i].y = game->positions_last_frame[i-1].y;
     }
 
 
-    for(i32 i = 0; i < game.snake_cell_count; i++) {
-        game.positions_last_frame[i].x = game.positions[i].x;
-        game.positions_last_frame[i].y = game.positions[i].y;
+    for(i32 i = 0; i < game->snake_cell_count; i++) {
+        game->positions_last_frame[i].x = game->positions[i].x;
+        game->positions_last_frame[i].y = game->positions[i].y;
     }
 }
 
 void
-render_loop(SDL_Renderer* renderer, Rendering& rendering, Game& game) {
-    for(i32 i = 0; i < game.snake_cell_count; i++) {
-        auto& rect = rendering.rects[i];
-        auto& position = game.positions[i];
-        rect.x = position.x * rendering.cell_width;
-        rect.y = (game.grid_size - position.y - 1) * rendering.cell_height;
+render_loop(SDL_Renderer* renderer, Rendering* rendering, Game* game) {
+    for(i32 i = 0; i < game->snake_cell_count; i++) {
+        auto* rect = &rendering->rects[i];
+        auto* position = &game->positions[i];
+        rect->x = position->x * rendering->cell_width;
+        rect->y = (game->grid_size - position->y - 1) * rendering->cell_height;
     }
 
-    SDL_RenderCopy(renderer, rendering.grid_texture, 0, 0);
+    SDL_RenderCopy(renderer, rendering->grid_texture, 0, 0);
 
     {
         const i32 k = 255;
@@ -495,37 +494,37 @@ render_loop(SDL_Renderer* renderer, Rendering& rendering, Game& game) {
     //Draw fruit
     {
         SDL_Rect circle_rect;
-        circle_rect.w = rendering.fruit_radius*2;
-        circle_rect.h = rendering.fruit_radius*2;
-        circle_rect.x = (game.fruit_pos.x * rendering.cell_width)+3;
-        circle_rect.y = ((game.grid_size-game.fruit_pos.y-1) * rendering.cell_height)+3;
-        SDL_RenderCopy(renderer, rendering.circle_texture, 0, &circle_rect);
+        circle_rect.w = rendering->fruit_radius*2;
+        circle_rect.h = rendering->fruit_radius*2;
+        circle_rect.x = (game->fruit_pos.x * rendering->cell_width)+3;
+        circle_rect.y = ((game->grid_size-game->fruit_pos.y-1) * rendering->cell_height)+3;
+        SDL_RenderCopy(renderer, rendering->circle_texture, 0, &circle_rect);
     }
 
-    if (rendering.draw_snake) {
-        SDL_RenderFillRects(renderer, rendering.rects, game.snake_cell_count);
+    if (rendering->draw_snake) {
+        SDL_RenderFillRects(renderer, rendering->rects, game->snake_cell_count);
     }
 
     SDL_RenderPresent(renderer);
 }
 
 void
-init_renderer(SDL_Renderer* renderer, Rendering& rendering) {
-    SDL_Surface* grid_surface = SDL_CreateRGBSurface(0, rendering.screen_width, rendering.screen_height, 32, 0, 0, 0, 0);
+init_renderer(SDL_Renderer* renderer, Rendering* rendering) {
+    SDL_Surface* grid_surface = SDL_CreateRGBSurface(0, rendering->screen_width, rendering->screen_height, 32, 0, 0, 0, 0);
     SDL_Renderer* grid_renderer = SDL_CreateSoftwareRenderer(grid_surface);
     render_grid(grid_renderer, rendering);
-    rendering.grid_texture = SDL_CreateTextureFromSurface(renderer, grid_surface);
+    rendering->grid_texture = SDL_CreateTextureFromSurface(renderer, grid_surface);
     SDL_DestroyRenderer(grid_renderer);
     SDL_FreeSurface(grid_surface);
 
     SDL_Surface* circle_surface =
-        SDL_CreateRGBSurface(0, rendering.fruit_radius*2+1, rendering.fruit_radius*2+1, 32, 0, 0, 0, 0);
+        SDL_CreateRGBSurface(0, rendering->fruit_radius*2+1, rendering->fruit_radius*2+1, 32, 0, 0, 0, 0);
     SDL_Renderer* circle_renderer = SDL_CreateSoftwareRenderer(circle_surface);
     SDL_SetRenderDrawColor(circle_renderer, 0, 0, 0, 0);
     SDL_RenderClear(circle_renderer);
     SDL_SetRenderDrawColor(circle_renderer, 255, 255, 255, 255);
-    render_circle(circle_renderer, 0, 0, rendering.fruit_radius);
-    rendering.circle_texture = SDL_CreateTextureFromSurface(renderer, circle_surface);
+    render_circle(circle_renderer, 0, 0, rendering->fruit_radius);
+    rendering->circle_texture = SDL_CreateTextureFromSurface(renderer, circle_surface);
     SDL_DestroyRenderer(circle_renderer);
     SDL_FreeSurface(circle_surface);
 }
@@ -583,10 +582,10 @@ main(i32 argc, char **argv) {
         return -1;
     }
 
-    init_renderer(renderer, rendering);
+    init_renderer(renderer, &rendering);
 
     srand(time(0));
-    reset_state(game, rendering);
+    reset_state(&game, &rendering);
 
     b32 running = true;
     f64 current_time = (f32)SDL_GetPerformanceCounter() /
@@ -657,13 +656,13 @@ main(i32 argc, char **argv) {
         if(current_time >= (last_update_time + game.frame_time)) {
             last_update_time = current_time;
             if(!game.collided) {
-                game_loop(game);
+                game_loop(&game);
             } else {
-                reset_routine(game, rendering);
+                reset_routine(&game, &rendering);
             }
         }
 
-        render_loop(renderer, rendering, game);
+        render_loop(renderer, &rendering, &game);
     }
 
     SDL_DestroyWindow(window);
