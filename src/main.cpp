@@ -3,20 +3,21 @@
 #include <math.h>
 #include <time.h>
 #include <stdint.h>
-#include <vector> 
+#include <vector>
 #include <algorithm>
 #include "SDL.h"
 
 #include <assert.h>
-#include <windows.h>
 
 #define internal static
 #define global_variable static
 
 #define array_count(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 
+#define max(a, b)  (((a) > (b)) ? (a) : (b))
+#define min(a, b)  (((a) < (b)) ? (a) : (b))
 
-/** TODO: 
+/** TODO:
   -Don't hog all the resources and run at 9001 FPS all the time.
 */
 
@@ -38,18 +39,23 @@ typedef i16 b16;
 typedef i32 b32;
 typedef i64 b64;
 
-struct v2 {
+struct Vec2 {
     i32 x, y;
 };
 
 inline bool
-operator==(const v2& lhs, const v2& rhs) {
+operator==(const Vec2& lhs, const Vec2& rhs) {
     return lhs.x == rhs.x && lhs.y == rhs.y;
 }
 
 inline bool
-operator!=(const v2& lhs, const v2& rhs) {
+operator!=(const Vec2& lhs, const Vec2& rhs) {
     return !(lhs == rhs);
+}
+
+template<typename T> inline b32
+contains(std::vector<T>& vec, T val) {
+    return std::find(vec.begin(), vec.end(), val) != vec.end();
 }
 
 struct Rendering {
@@ -73,9 +79,9 @@ struct Game {
     i32 snake_cell_count;
     i32 max_cell_count;
     i32 input;
-    v2* positions;
-    v2* positions_last_frame;
-    v2 fruit_pos;
+    Vec2* positions;
+    Vec2* positions_last_frame;
+    Vec2 fruit_pos;
     i32 direction;
     b32 collided;
     u32 flash_count;
@@ -83,25 +89,18 @@ struct Game {
 };
 
 internal f32
-distance(v2 a, v2 b) {
+distance(Vec2 a, Vec2 b) {
     f32 diff_x = b.x - a.x;
     f32 diff_y = b.y - a.y;
     f32 result = sqrt(diff_x*diff_x + diff_y*diff_y);
     return result;
 }
 
-enum INPUT_E {
-    INPUT_UP,
-    INPUT_DOWN,
-    INPUT_LEFT,
-    INPUT_RIGHT,
-};
-
-enum DIRECTION_E {
-    DIRECTION_UP,
-    DIRECTION_DOWN,
-    DIRECTION_LEFT,
-    DIRECTION_RIGHT,
+enum Direction {
+    UP,
+    DOWN,
+    LEFT,
+    RIGHT,
 };
 
 internal void
@@ -121,8 +120,8 @@ render_grid(SDL_Renderer *renderer, Rendering& rendering) {
 
 internal void
 render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
-    v2 cur_pos;
-    v2 center = {px + radius, py + radius};
+    Vec2 cur_pos;
+    Vec2 center = {px + radius, py + radius};
 
     i32 count = (radius*2) * (radius*2);
     i32 point_count = 0;
@@ -173,14 +172,14 @@ find_lowest_fscore_index(AstarScores *scores, i32 count) {
 }
 
 inline i32
-astar_heuristic(v2 pos, v2 goal) {
+astar_heuristic(Vec2 pos, Vec2 goal) {
     return (i32)distance(pos, goal);
 }
 
 inline b32
-check_walkable_cell(v2 pos, v2* positions, i32 positions_count) {
+check_walkable_cell(Vec2 pos, Vec2* positions, i32 positions_count) {
     for(i32 i = 0; i < positions_count; i++) {
-        v2 test_pos = positions[i];
+        Vec2 test_pos = positions[i];
         if(pos.x == test_pos.x && pos.y == test_pos.y) {
             return false;
         }
@@ -189,21 +188,21 @@ check_walkable_cell(v2 pos, v2* positions, i32 positions_count) {
 }
 
 internal i32
-find_walkable_adjacent_cells(v2 current_cell, v2* result_buffer,
-                             v2* positions, i32 positions_count
+find_walkable_adjacent_cells(Vec2 current_cell, Vec2* result_buffer,
+                             Vec2* positions, i32 positions_count
 ) {
 }
 
 internal void //needs return value
-astar(Game& game, v2 start, v2 goal) {
+astar(Game& game, Vec2 start, Vec2 goal) {
     //TODO: are sets better than vectors for this?
     i32 max_count = game.grid_size*game.grid_size;
-    auto closed_set_pos = std::vector<v2>(max_count);
+    auto closed_set_pos = std::vector<Vec2>(max_count);// std::vector<Vec2>(max_count);
     auto closed_set_scr = std::vector<AstarScores>(max_count);
-    auto open_set_pos = std::vector<v2>(max_count);
+    auto open_set_pos = std::vector<Vec2>(max_count);
     auto open_set_scr = std::vector<AstarScores>(max_count);
 
-    v2 current_pos = start;
+    Vec2 current_pos = start;
 
     AstarScores current_scr;
     current_scr.G = 0;
@@ -218,7 +217,8 @@ astar(Game& game, v2 start, v2 goal) {
         closed_set_scr.push_back(open_set_scr[current_index]);
         open_set_pos.erase(open_set_pos.begin() + current_index);
         open_set_scr.erase(open_set_scr.begin() + current_index);
-        if(std::find(closed_set_pos.begin(), closed_set_pos.end(), goal) != closed_set_pos.end()) {
+
+        if(contains(closed_set_pos, goal)) {
             //Found path
             break;
         }
@@ -229,36 +229,36 @@ astar(Game& game, v2 start, v2 goal) {
 /*
 [openList add:originalSquare]; // start by adding the original position to the open list
 do {
-	currentSquare = [openList squareWithLowestFScore]; // Get the square with the lowest F score
-	
-	[closedList add:currentSquare]; // add the current square to the closed list
-	[openList remove:currentSquare]; // remove it to the open list
-	
-	if ([closedList contains:destinationSquare]) { // if we added the destination to the closed list, we've found a path
-		// PATH FOUND
-		break; // break the loop
-	}
-	
-	adjacentSquares = [currentSquare walkableAdjacentSquares]; // Retrieve all its walkable adjacent squares
-	
-	foreach (aSquare in adjacentSquares) {
-		
-		if ([closedList contains:aSquare]) { // if this adjacent square is already in the closed list ignore it
-			continue; // Go to the next adjacent square
-		}
-		
-		if (![openList contains:aSquare]) { // if its not in the open list
-			
-			// compute its score, set the parent
-			[openList add:aSquare]; // and add it to the open list
-			
-		} else { // if its already in the open list
-			
-			// test if using the current G score make the aSquare F score lower, if yes update the parent because it means its a better path
-			
-		}
-	}
-	
+    currentSquare = [openList squareWithLowestFScore]; // Get the square with the lowest F score
+
+    [closedList add:currentSquare]; // add the current square to the closed list
+    [openList remove:currentSquare]; // remove it to the open list
+
+    if ([closedList contains:destinationSquare]) { // if we added the destination to the closed list, we've found a path
+        // PATH FOUND
+        break; // break the loop
+    }
+
+    adjacentSquares = [currentSquare walkableAdjacentSquares]; // Retrieve all its walkable adjacent squares
+
+    foreach (aSquare in adjacentSquares) {
+
+        if ([closedList contains:aSquare]) { // if this adjacent square is already in the closed list ignore it
+            continue; // Go to the next adjacent square
+        }
+
+        if (![openList contains:aSquare]) { // if its not in the open list
+
+            // compute its score, set the parent
+            [openList add:aSquare]; // and add it to the open list
+
+        } else { // if its already in the open list
+
+            // test if using the current G score make the aSquare F score lower, if yes update the parent because it means its a better path
+
+        }
+    }
+
 } while(![openList isEmpty]); // Continue until there is no more available square in the open list (which means there is no path)
 */
 /*
@@ -298,21 +298,21 @@ function A*(start, goal)
 
         for each neighbor of current
             if neighbor in closedSet
-                continue		// Ignore the neighbor which is already evaluated.
+                continue    // Ignore the neighbor which is already evaluated.
 
-            if neighbor not in openSet	// Discover a new node
+            if neighbor not in openSet  // Discover a new node
                 openSet.Add(neighbor)
-            
+
             // The distance from start to a neighbor
             //the "dist_between" function may vary as per the solution requirements.
             tentative_gScore := gScore[current] + dist_between(current, neighbor)
             if tentative_gScore >= gScore[neighbor]
-                continue		// This is not a better path.
+                continue    // This is not a better path.
 
             // This path is the best until now. Record it!
             cameFrom[neighbor] := current
             gScore[neighbor] := tentative_gScore
-            fScore[neighbor] := gScore[neighbor] + heuristic_cost_estimate(neighbor, goal) 
+            fScore[neighbor] := gScore[neighbor] + heuristic_cost_estimate(neighbor, goal)
 
     return failure
 
@@ -327,7 +327,7 @@ function reconstruct_path(cameFrom, current)
 internal void
 randomize_fruit_pos(Game& game) {
     b32 success = false;
-    v2 new_pos;
+    Vec2 new_pos;
     while(!success) {
         success=true;
         new_pos.x = rand() % game.grid_size;
@@ -357,8 +357,8 @@ reset_state(Game& game, Rendering& rendering) {
 
         rect.w = rendering.cell_width;
         rect.h = rendering.cell_height;
-        pos.x = snake_pos.x;// snake_pos.x;
-        pos.y = snake_pos.y;// snake_pos.y;
+        pos.x = snake_pos.x;
+        pos.y = snake_pos.y;
 
         game.positions_last_frame[i] = pos;
     }
@@ -391,39 +391,39 @@ game_loop(Game& game) {
     auto& snake_pos = game.positions[0];
 
     switch(game.input) {
-        case INPUT_UP:
-            if(game.direction == DIRECTION_RIGHT || game.direction == DIRECTION_LEFT) {
-                game.direction = DIRECTION_UP;
+        case UP:
+            if(game.direction == RIGHT || game.direction == LEFT) {
+                game.direction = UP;
             }
         break;
-        case INPUT_DOWN:
-            if(game.direction == DIRECTION_RIGHT || game.direction == DIRECTION_LEFT) {
-                game.direction = DIRECTION_DOWN;
+        case DOWN:
+            if(game.direction == RIGHT || game.direction == LEFT) {
+                game.direction = DOWN;
             }
         break;
-        case INPUT_RIGHT:
-            if(game.direction == DIRECTION_UP || game.direction == DIRECTION_DOWN) {
-                game.direction = DIRECTION_RIGHT;
+        case RIGHT:
+            if(game.direction == UP || game.direction == DOWN) {
+                game.direction = RIGHT;
             }
         break;
-        case INPUT_LEFT:
-            if(game.direction == DIRECTION_UP || game.direction == DIRECTION_DOWN) {
-                game.direction = DIRECTION_LEFT;
+        case LEFT:
+            if(game.direction == UP || game.direction == DOWN) {
+                game.direction = LEFT;
             }
         break;
     }
 
     switch(game.direction) {
-        case DIRECTION_UP:
+        case UP:
             ++snake_pos.y;
         break;
-        case DIRECTION_DOWN:
+        case DOWN:
             --snake_pos.y;
         break;
-        case DIRECTION_LEFT:
+        case LEFT:
             --snake_pos.x;
         break;
-        case DIRECTION_RIGHT:
+        case RIGHT:
             ++snake_pos.x;
         break;
     }
@@ -435,19 +435,19 @@ game_loop(Game& game) {
     }
 
     b32 edge_collision = false;
-    if(game.direction == DIRECTION_RIGHT && snake_pos.x >= game.grid_size) {
+    if(game.direction == RIGHT && snake_pos.x >= game.grid_size) {
         edge_collision = true;
         --snake_pos.x;
     }
-    if (game.direction == DIRECTION_LEFT && snake_pos.x < 0) {
+    if (game.direction == LEFT && snake_pos.x < 0) {
         edge_collision = true;
         ++snake_pos.x;
     }
-    if (game.direction == DIRECTION_UP && snake_pos.y >= game.grid_size) {
+    if (game.direction == UP && snake_pos.y >= game.grid_size) {
         edge_collision = true;
         --snake_pos.y;
     }
-    if (game.direction == DIRECTION_DOWN && snake_pos.y < 0) {
+    if (game.direction == DOWN && snake_pos.y < 0) {
         edge_collision = true;
         ++snake_pos.y;
     }
@@ -459,7 +459,8 @@ game_loop(Game& game) {
 
     if(snake_pos.x == game.fruit_pos.x && snake_pos.y == game.fruit_pos.y) {
         game.frame_time = max(game.min_frame_time, game.frame_time * game.speed_up_rate);
-        game.snake_cell_count = min(++game.snake_cell_count, game.max_cell_count);
+        i32 increment = game.snake_cell_count + 1;
+        game.snake_cell_count = min(increment, game.max_cell_count);
         randomize_fruit_pos(game);
     }
 
@@ -548,9 +549,9 @@ main(i32 argc, char **argv) {
     game.snake_cell_count = 0;
     game.max_cell_count = game.grid_size * game.grid_size;
     game.input = 0;
-    game.positions = (v2*)malloc(sizeof(v2) * game.max_cell_count);
-    game.positions_last_frame = (v2*)malloc(sizeof(v2) * game.max_cell_count);
-    game.direction = DIRECTION_RIGHT;
+    game.positions = (Vec2*)malloc(sizeof(Vec2) * game.max_cell_count);
+    game.positions_last_frame = (Vec2*)malloc(sizeof(Vec2) * game.max_cell_count);
+    game.direction = RIGHT;
     game.collided = false;
     game.flash_count   = 5;
     game.flash_counter = 0;
@@ -629,22 +630,22 @@ main(i32 argc, char **argv) {
                         break;
 
                         case SDLK_UP: {
-                            game.input = INPUT_UP;
+                            game.input = UP;
                         }
                         break;
 
                         case SDLK_DOWN: {
-                            game.input = INPUT_DOWN;
+                            game.input = DOWN;
                         }
                         break;
 
                         case SDLK_LEFT: {
-                            game.input = INPUT_LEFT;
+                            game.input = LEFT;
                         }
                         break;
 
                         case SDLK_RIGHT: {
-                            game.input = INPUT_RIGHT;
+                            game.input = RIGHT;
                         }
                         break;
                     }
