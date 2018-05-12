@@ -1,18 +1,10 @@
-#include <stdio.h>
 #include <stdlib.h>
-#include <math.h>
 #include <time.h>
-#include <stdint.h>
 #include <vector>
 #include <algorithm>
 #include "SDL.h"
 
 #include <assert.h>
-
-#define internal static
-#define global_variable static
-
-#define array_count(x) ((sizeof(x) / sizeof(0 [x])) / ((size_t)(!(sizeof(x) % sizeof(0 [x])))))
 
 #define max(a, b)  (((a) > (b)) ? (a) : (b))
 #define min(a, b)  (((a) < (b)) ? (a) : (b))
@@ -21,6 +13,7 @@
   -Don't hog all the resources and run at 9001 FPS all the time.
 */
 
+#include <stdint.h>
 typedef int8_t i8;
 typedef int16_t i16;
 typedef int32_t i32;
@@ -102,7 +95,7 @@ struct Game {
     u32 flash_counter;
 };
 
-internal f32
+static f32
 distance(Vec2 a, Vec2 b) {
     f32 diff_x = b.x - a.x;
     f32 diff_y = b.y - a.y;
@@ -117,7 +110,7 @@ enum Direction {
     RIGHT,
 };
 
-internal void
+static void
 render_grid(SDL_Renderer *renderer, Rendering* rendering) {
     const i32 k = 64;
     SDL_SetRenderDrawColor(renderer, k, k, k, 128);
@@ -131,7 +124,7 @@ render_grid(SDL_Renderer *renderer, Rendering* rendering) {
     }
 }
 
-internal void
+static void
 render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
     Vec2 cur_pos;
     Vec2 center = {px + radius, py + radius};
@@ -159,18 +152,18 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
     free(point_buffer);
 }
 
-struct AstarScores {
+struct AstarScore {
     i32 G;
     i32 H;
 };
 
 inline i32
-f_score(AstarScores score) {
+f_score(AstarScore score) {
     return score.G + score.H;
 }
 
-internal i32
-find_lowest_fscore_index(AstarScores *scores, i32 count) {
+static i32
+find_lowest_fscore_index(AstarScore *scores, i32 count) {
     i32 best_index = 0;
     i32 lowest_F = f_score(scores[0]);
 
@@ -200,7 +193,7 @@ check_walkable_cell(Vec2 pos, Vec2* positions, i32 positions_count) {
     return true;
 }
 
-internal i32
+static i32
 find_walkable_adjacent_cells(Vec2 current_cell, Vec2* result_buffer,
                              Vec2* positions, i32 positions_count)
 {
@@ -243,29 +236,33 @@ find_walkable_adjacent_cells(Vec2 current_cell, Vec2* result_buffer,
     return found_count;
 }
 
-internal void //INCOMPLETE
+static void //INCOMPLETE
 astar(Vec2 start, Vec2 goal,
       Vec2* positions, i32 positions_count,
       i32 grid_size)
 {
     //TODO: are std::sets better than std::vectors for this?
     i32 max_count = grid_size;
-    auto closed_set_pos = std::vector<Vec2>(max_count);// std::vector<Vec2>(max_count);
-    auto closed_set_scr = std::vector<AstarScores>(max_count);
+    auto closed_set_pos = std::vector<Vec2>(max_count);
+    auto closed_set_scr = std::vector<AstarScore>(max_count);
     auto open_set_pos = std::vector<Vec2>(max_count);
-    auto open_set_scr = std::vector<AstarScores>(max_count);
+    auto open_set_scr = std::vector<AstarScore>(max_count);
 
     Vec2 current_pos = start;
 
-    AstarScores current_scr;
+    AstarScore current_scr;
     current_scr.G = 0;
     current_scr.H = astar_heuristic(start, goal);
 
     closed_set_pos.push_back(current_pos);
     closed_set_scr.push_back(current_scr);
 
+    Vec2 adjacent_cells[8];
+
     do {
         i32 current_index = find_lowest_fscore_index(&open_set_scr[0], open_set_scr.size());
+        current_pos = open_set_pos[current_index];
+        current_scr = open_set_scr[current_index];
         closed_set_pos.push_back(open_set_pos[current_index]);
         closed_set_scr.push_back(open_set_scr[current_index]);
         open_set_pos.erase(open_set_pos.begin() + current_index);
@@ -275,6 +272,32 @@ astar(Vec2 start, Vec2 goal,
             //Found path
             break;
         }
+
+        i32 adjacent_cells_count = find_walkable_adjacent_cells(current_pos, adjacent_cells,
+                                                                positions, positions_count);
+
+        for(i32 i = 0; i < adjacent_cells_count; i++) {
+            Vec2 pos = adjacent_cells[i];
+            if(contains(&closed_set_pos, pos)) {
+                continue;
+            }
+
+            if(!contains(&open_set_pos, pos)) {
+                AstarScore scr;
+                scr.G = current_scr.G+1;
+                scr.H = astar_heuristic(pos, goal);
+                open_set_pos.push_back(pos);
+                open_set_scr.push_back(scr);
+            } else {
+                AstarScore scr;
+                scr.G = current_scr.G;
+                scr.H = astar_heuristic(pos, goal);
+                if(f_score(scr) < f_score(current_scr)) {
+                    current_scr = scr;
+                }
+            }
+        }
+
     } while(!open_set_pos.empty());
 }
 
@@ -377,7 +400,7 @@ function reconstruct_path(cameFrom, current)
     return total_path
 */
 
-internal void
+static void
 randomize_fruit_pos(Game* game) {
     b32 success = false;
     Vec2 new_pos;
@@ -394,7 +417,7 @@ randomize_fruit_pos(Game* game) {
     game->fruit_pos = new_pos;
 }
 
-internal void
+static void
 reset_state(Game* game, Rendering* rendering) {
     game->collided = false;
 
@@ -423,7 +446,7 @@ reset_state(Game* game, Rendering* rendering) {
     game->frame_time = game->start_frame_time;
 }
 
-internal void
+static void
 reset_routine(Game* game, Rendering* rendering) {
     game->frame_time = game->start_frame_time;
     if(game->flash_counter < game->flash_count) {
@@ -439,7 +462,7 @@ reset_routine(Game* game, Rendering* rendering) {
     }
 }
 
-internal void
+static void
 game_loop(Game* game) {
     auto* snake_pos = game->positions;
 
@@ -588,7 +611,7 @@ main(i32 argc, char **argv) {
     // Init SDL stuff
     if (SDL_Init(SDL_INIT_VIDEO) < 0) {
         const char* error = SDL_GetError();
-        assert("SDL_Error" == 0);
+        assert("SDL_Error" == error);
         return -1;
     }
     atexit(SDL_Quit);
@@ -632,7 +655,7 @@ main(i32 argc, char **argv) {
 
     if (!window || !renderer) {
         const char* error = SDL_GetError();
-        assert("SDL_Error" == 0);
+        assert("SDL_Error" == error);
         return -1;
     }
 
