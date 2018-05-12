@@ -244,9 +244,12 @@ find_walkable_adjacent_cells(Vec2 current_cell, Vec2* result_buffer,
 }
 
 internal void //INCOMPLETE
-astar(Game* game, Vec2 start, Vec2 goal) {
-    //TODO: are sets better than vectors for this?
-    i32 max_count = game->grid_size*game->grid_size;
+astar(Vec2 start, Vec2 goal,
+      Vec2* positions, i32 positions_count,
+      i32 grid_size)
+{
+    //TODO: are std::sets better than std::vectors for this?
+    i32 max_count = grid_size;
     auto closed_set_pos = std::vector<Vec2>(max_count);// std::vector<Vec2>(max_count);
     auto closed_set_scr = std::vector<AstarScores>(max_count);
     auto open_set_pos = std::vector<Vec2>(max_count);
