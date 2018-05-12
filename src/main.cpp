@@ -43,6 +43,20 @@ struct Vec2 {
     i32 x, y;
 };
 
+inline Vec2
+operator+(const Vec2& lhs, const Vec2& rhs) {
+    return { lhs.x + rhs.x, lhs.y + lhs.y };
+}
+
+inline Vec2&
+operator+=(Vec2& lhs, const Vec2& rhs) {
+    Vec2 result;
+    result.x = lhs.x + rhs.x;
+    result.y = lhs.y + rhs.y;
+    lhs = result;
+    return lhs;
+}
+
 inline bool
 operator==(const Vec2& lhs, const Vec2& rhs) {
     return lhs.x == rhs.x && lhs.y == rhs.y;
@@ -188,11 +202,48 @@ check_walkable_cell(Vec2 pos, Vec2* positions, i32 positions_count) {
 
 internal i32
 find_walkable_adjacent_cells(Vec2 current_cell, Vec2* result_buffer,
-                             Vec2* positions, i32 positions_count
-) {
+                             Vec2* positions, i32 positions_count)
+{
+    const i32 candidate_count = 8;
+    Vec2 candidate_positions[candidate_count] = {
+        //Top row
+        { -1,  1 }, { 0,  1 }, { 1,  1 },
+
+        //Middle row
+        { -1,  0 },            { 1,  0 },
+
+        //Bottom row
+        { -1, -1 }, { 0, -1 }, { 1, -1 }
+    };
+    for(i32 i = 0; i < candidate_count; i++) {
+        //Offset by current_cell's position
+        candidate_positions[i] += current_cell;
+    }
+    b32 candidate_is_not_walkable[candidate_count] = {0};
+
+    //Mark cells walkable or not
+    for(i32 j = 0; j < candidate_count; j++) {
+        for(i32 i = 0; i < positions_count; i++) {
+            auto candidate_pos = candidate_positions[j];
+            auto compare_pos = positions[i];
+            if(candidate_pos == compare_pos) {
+                candidate_is_not_walkable[j] = true;
+            }
+        }
+    }
+
+    i32 found_count = 0;
+    for(i32 i = 0; i < candidate_count; i++) {
+        if(!candidate_is_not_walkable[i]) {
+            result_buffer[found_count] = candidate_positions[i];
+            found_count++;
+        }
+    }
+
+    return found_count;
 }
 
-internal void //needs return value
+internal void //INCOMPLETE
 astar(Game* game, Vec2 start, Vec2 goal) {
     //TODO: are sets better than vectors for this?
     i32 max_count = game->grid_size*game->grid_size;
