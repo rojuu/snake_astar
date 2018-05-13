@@ -295,7 +295,9 @@ astar(Vec2 start, Vec2 goal,
 {
     i32 max_count = grid_size*grid_size;
     auto open_set = std::vector<AstarCell*>();
+    open_set.reserve(max_count);
     auto closed_set = std::vector<AstarCell*>();
+    closed_set.reserve(max_count);
     auto* cells = (AstarCell*)calloc(max_count, sizeof(AstarCell));
     i32 cell_counter = 0;
 
