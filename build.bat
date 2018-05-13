@@ -1,5 +1,7 @@
 @echo off
 SETLOCAL
+set EXE_NAME=snake_astar
+
 set TARGET=x64
 
 set SDL2=%CD%\libs\SDL2-2.0.5
@@ -19,6 +21,6 @@ if not exist SDL2.dll (
     robocopy %SDL_LIB% . SDL2.dll
 )
 
-cl %CommonCompilerFlags% ..\src\main.cpp /link /subsystem:windows %CommonLinkerFlags% /out:snake_astar.exe
+cl %CommonCompilerFlags% ..\src\main.cpp /link /subsystem:windows %CommonLinkerFlags% /out:%EXE_NAME%.exe
 popd
 echo Done

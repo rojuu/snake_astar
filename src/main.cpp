@@ -36,6 +36,18 @@ struct Vec2 {
     i32 x, y;
 };
 
+struct AstarScore {
+    i32 G;
+    i32 H;
+};
+
+struct AstarCell {
+    Vec2 position;
+    AstarScore score;
+    AstarCell* previous;
+    AstarCell* next;
+};
+
 inline Vec2
 operator+(const Vec2& lhs, const Vec2& rhs) {
     return { lhs.x + rhs.x, lhs.y + lhs.y };
@@ -63,6 +75,23 @@ operator!=(const Vec2& lhs, const Vec2& rhs) {
 template<typename T> inline b32
 contains(std::vector<T>* vec, T val) {
     return std::find(vec->begin(), vec->end(), val) != vec->end();
+}
+
+//TODO: Badly named? Maybe this returning the found_cell is bad?
+static b32
+contains_position(std::vector<AstarCell*> *vec, Vec2 pos, AstarCell** found_cell_ptr = 0) {
+    b32 found = false;
+    for(int i = 0; i < vec->size(); i++) {
+        auto* cell = vec->at(i);
+        if(cell->position == pos) {
+            found = true;
+            if(found_cell_ptr) {
+                *found_cell_ptr = cell;
+            }
+            break;
+        }
+    }
+    return found;
 }
 
 struct Rendering {
@@ -152,24 +181,20 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
     free(point_buffer);
 }
 
-struct AstarScore {
-    i32 G;
-    i32 H;
-};
-
 inline i32
 f_score(AstarScore score) {
     return score.G + score.H;
 }
 
 static i32
-find_lowest_fscore_index(AstarScore *scores, i32 count) {
+find_lowest_fscore_index(std::vector<AstarCell*>* cells, i32 count) {
     i32 best_index = 0;
-    i32 lowest_F = f_score(scores[0]);
+    i32 lowest_F = f_score(cells->at(0)->score);
 
     for(i32 i = 1; i < count; i++) {
-        i32 F = f_score(scores[i]);
+        i32 F = f_score(cells->at(i)->score);
         if(F < lowest_F) {
+            lowest_F = F;
             best_index = i;
         }
     }
@@ -194,33 +219,40 @@ check_walkable_cell(Vec2 pos, Vec2* positions, i32 positions_count) {
 }
 
 static i32
-find_walkable_adjacent_cells(Vec2 current_cell, Vec2* result_buffer,
-                             Vec2* positions, i32 positions_count)
+find_walkable_adjacent_cells(Vec2 current_position, Vec2* result_buffer,
+                             Vec2* positions, i32 positions_count, i32 grid_size)
 {
-    const i32 candidate_count = 8;
+    const i32 candidate_count = 4;
     Vec2 candidate_positions[candidate_count] = {
         //Top row
-        { -1,  1 }, { 0,  1 }, { 1,  1 },
+                    { 0,  1 },
 
         //Middle row
         { -1,  0 },            { 1,  0 },
 
         //Bottom row
-        { -1, -1 }, { 0, -1 }, { 1, -1 }
+                    { 0, -1 }
     };
     for(i32 i = 0; i < candidate_count; i++) {
-        //Offset by current_cell's position
-        candidate_positions[i] += current_cell;
+        //Offset by current_position
+        candidate_positions[i] += current_position;
     }
     b32 candidate_is_not_walkable[candidate_count] = {0};
 
     //Mark cells walkable or not
     for(i32 j = 0; j < candidate_count; j++) {
+        auto candidate_pos = candidate_positions[j];
+        if(candidate_pos.y == grid_size || candidate_pos.x == grid_size ||
+           candidate_pos.y < 0 || candidate_pos.x < 0)
+        {
+            candidate_is_not_walkable[j] = true;
+            continue;
+        }
         for(i32 i = 0; i < positions_count; i++) {
-            auto candidate_pos = candidate_positions[j];
             auto compare_pos = positions[i];
             if(candidate_pos == compare_pos) {
                 candidate_is_not_walkable[j] = true;
+                break;
             }
         }
     }
@@ -236,169 +268,101 @@ find_walkable_adjacent_cells(Vec2 current_cell, Vec2* result_buffer,
     return found_count;
 }
 
-static void //INCOMPLETE
+static std::vector<Vec2>
+astar_reconstruct_path(std::vector<AstarCell*>* closed_set) {
+    AstarCell* first = 0;
+    for(auto* cell : *closed_set) {
+        if(cell->previous == 0) {
+            first = cell;
+            break;
+        }
+    }
+
+    std::vector<Vec2> path;
+    AstarCell* current = first;
+    while(current->next != 0) {
+        path.push_back(current->position);
+        current = current->next;
+    }
+
+    return path;
+}
+
+static std::vector<Vec2>
 astar(Vec2 start, Vec2 goal,
       Vec2* positions, i32 positions_count,
       i32 grid_size)
 {
-    //TODO: are std::sets better than std::vectors for this?
-    i32 max_count = grid_size;
-    auto closed_set_pos = std::vector<Vec2>(max_count);
-    auto closed_set_scr = std::vector<AstarScore>(max_count);
-    auto open_set_pos = std::vector<Vec2>(max_count);
-    auto open_set_scr = std::vector<AstarScore>(max_count);
+    i32 max_count = grid_size*grid_size;
+    auto open_set = std::vector<AstarCell*>();
+    auto closed_set = std::vector<AstarCell*>();
+    auto* cells = (AstarCell*)calloc(max_count, sizeof(AstarCell));
+    i32 cell_counter = 0;
 
-    Vec2 current_pos = start;
+    AstarCell* current_cell = &cells[cell_counter++];
+    current_cell->position = start;
+    current_cell->score.G = 0;
+    current_cell->score.H = astar_heuristic(start, goal);
 
-    AstarScore current_scr;
-    current_scr.G = 0;
-    current_scr.H = astar_heuristic(start, goal);
-
-    closed_set_pos.push_back(current_pos);
-    closed_set_scr.push_back(current_scr);
+    open_set.push_back(current_cell);
 
     Vec2 adjacent_cells[8];
 
     do {
-        i32 current_index = find_lowest_fscore_index(&open_set_scr[0], open_set_scr.size());
-        current_pos = open_set_pos[current_index];
-        current_scr = open_set_scr[current_index];
-        closed_set_pos.push_back(open_set_pos[current_index]);
-        closed_set_scr.push_back(open_set_scr[current_index]);
-        open_set_pos.erase(open_set_pos.begin() + current_index);
-        open_set_scr.erase(open_set_scr.begin() + current_index);
+        i32 current_index = find_lowest_fscore_index(&open_set, open_set.size());
+        current_cell = open_set[current_index];
 
-        if(contains(&closed_set_pos, goal)) {
+        closed_set.push_back(open_set[current_index]);
+        open_set.erase(open_set.begin() + current_index);
+
+        if(contains_position(&closed_set, goal)) {
             //Found path
             break;
         }
 
-        i32 adjacent_cells_count = find_walkable_adjacent_cells(current_pos, adjacent_cells,
-                                                                positions, positions_count);
+        i32 adjacent_cells_count = find_walkable_adjacent_cells(current_cell->position, adjacent_cells,
+                                                                positions, positions_count, grid_size);
 
         for(i32 i = 0; i < adjacent_cells_count; i++) {
             Vec2 pos = adjacent_cells[i];
-            if(contains(&closed_set_pos, pos)) {
+            if(contains_position(&closed_set, pos)) {
                 continue;
             }
 
-            if(!contains(&open_set_pos, pos)) {
-                AstarScore scr;
-                scr.G = current_scr.G+1;
-                scr.H = astar_heuristic(pos, goal);
-                open_set_pos.push_back(pos);
-                open_set_scr.push_back(scr);
+            AstarCell* found_cell;
+            if(!contains_position(&open_set, pos, &found_cell)) {
+                AstarScore score;
+                score.G = current_cell->score.G+1;
+                score.H = astar_heuristic(pos, goal);
+                AstarCell* cell = &cells[cell_counter++];
+                cell->position = pos;
+                cell->score = score;
+                cell->previous = current_cell;
+                current_cell->next = cell;
+                open_set.push_back(cell);
             } else {
                 AstarScore scr;
-                scr.G = current_scr.G;
+                scr.G = current_cell->score.G+1;
                 scr.H = astar_heuristic(pos, goal);
-                if(f_score(scr) < f_score(current_scr)) {
-                    current_scr = scr;
+                if(f_score(scr) < f_score(found_cell->score)) {
+                    found_cell->score = scr;
+                    found_cell->previous = current_cell;
+                    current_cell->next = found_cell;
                 }
             }
         }
 
-    } while(!open_set_pos.empty());
+    } while(!open_set.empty());
+
+
+    std::vector<Vec2> path;
+    if(!closed_set.empty()) {
+        path = astar_reconstruct_path(&closed_set);
+    }
+
+    free(cells);
+    return path;
 }
-
-// https://www.raywenderlich.com/4946/introduction-to-a-pathfinding
-/*
-[openList add:originalSquare]; // start by adding the original position to the open list
-do {
-    currentSquare = [openList squareWithLowestFScore]; // Get the square with the lowest F score
-
-    [closedList add:currentSquare]; // add the current square to the closed list
-    [openList remove:currentSquare]; // remove it to the open list
-
-    if ([closedList contains:destinationSquare]) { // if we added the destination to the closed list, we've found a path
-        // PATH FOUND
-        break; // break the loop
-    }
-
-    adjacentSquares = [currentSquare walkableAdjacentSquares]; // Retrieve all its walkable adjacent squares
-
-    foreach (aSquare in adjacentSquares) {
-
-        if ([closedList contains:aSquare]) { // if this adjacent square is already in the closed list ignore it
-            continue; // Go to the next adjacent square
-        }
-
-        if (![openList contains:aSquare]) { // if its not in the open list
-
-            // compute its score, set the parent
-            [openList add:aSquare]; // and add it to the open list
-
-        } else { // if its already in the open list
-
-            // test if using the current G score make the aSquare F score lower, if yes update the parent because it means its a better path
-
-        }
-    }
-
-} while(![openList isEmpty]); // Continue until there is no more available square in the open list (which means there is no path)
-*/
-/*
-function A*(start, goal)
-    // The set of nodes already evaluated
-    closedSet := {}
-
-    // The set of currently discovered nodes that are not evaluated yet.
-    // Initially, only the start node is known.
-    openSet := {start}
-
-    // For each node, which node it can most efficiently be reached from.
-    // If a node can be reached from many nodes, cameFrom will eventually contain the
-    // most efficient previous step.
-    cameFrom := an empty map
-
-    // For each node, the cost of getting from the start node to that node.
-    gScore := map with default value of Infinity
-
-    // The cost of going from start to start is zero.
-    gScore[start] := 0
-
-    // For each node, the total cost of getting from the start node to the goal
-    // by passing by that node. That value is partly known, partly heuristic.
-    fScore := map with default value of Infinity
-
-    // For the first node, that value is completely heuristic.
-    fScore[start] := heuristic_cost_estimate(start, goal)
-
-    while openSet is not empty
-        current := the node in openSet having the lowest fScore[] value
-        if current = goal
-            return reconstruct_path(cameFrom, current)
-
-        openSet.Remove(current)
-        closedSet.Add(current)
-
-        for each neighbor of current
-            if neighbor in closedSet
-                continue    // Ignore the neighbor which is already evaluated.
-
-            if neighbor not in openSet  // Discover a new node
-                openSet.Add(neighbor)
-
-            // The distance from start to a neighbor
-            //the "dist_between" function may vary as per the solution requirements.
-            tentative_gScore := gScore[current] + dist_between(current, neighbor)
-            if tentative_gScore >= gScore[neighbor]
-                continue    // This is not a better path.
-
-            // This path is the best until now. Record it!
-            cameFrom[neighbor] := current
-            gScore[neighbor] := tentative_gScore
-            fScore[neighbor] := gScore[neighbor] + heuristic_cost_estimate(neighbor, goal)
-
-    return failure
-
-function reconstruct_path(cameFrom, current)
-    total_path := [current]
-    while current in cameFrom.Keys:
-        current := cameFrom[current]
-        total_path.append(current)
-    return total_path
-*/
 
 static void
 randomize_fruit_pos(Game* game) {
@@ -466,6 +430,8 @@ static void
 game_loop(Game* game) {
     auto* snake_pos = game->positions;
 
+#if 0
+    //Player input
     switch(game->input) {
         case UP:
             if(game->direction == RIGHT || game->direction == LEFT) {
@@ -503,6 +469,38 @@ game_loop(Game* game) {
             ++snake_pos->x;
         break;
     }
+#else
+    //Astar
+    auto path = astar(*snake_pos, game->fruit_pos, game->positions, game->snake_cell_count, game->grid_size);
+    if(path.size() > 1) {
+        Vec2 path_next_pos = path[1]; //First element is our own position
+        if(path_next_pos.y < snake_pos->y) {
+            game->direction = DOWN;
+        } else if(path_next_pos.x < snake_pos->x) {
+            game->direction = LEFT;
+        } else if(path_next_pos.y > snake_pos->y) {
+            game->direction = UP;
+        } else if(path_next_pos.x > snake_pos->x) {
+            game->direction = RIGHT;
+        }
+        *snake_pos = path_next_pos;
+    } else {
+        switch(game->direction) {
+            case UP:
+                ++snake_pos->y;
+                break;
+            case DOWN:
+                --snake_pos->y;
+                break;
+            case LEFT:
+                --snake_pos->x;
+                break;
+            case RIGHT:
+                ++snake_pos->x;
+                break;
+        }
+    }
+#endif
 
     for(i32 i = 1; i < game->snake_cell_count; i++) {
         if(snake_pos->x == game->positions[i].x && snake_pos->y == game->positions[i].y) {
