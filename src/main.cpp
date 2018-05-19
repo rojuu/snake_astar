@@ -6,8 +6,12 @@
 
 #include <assert.h>
 
+#if 1
+#include <windows.h>
+#else
 #define max(a, b)  (((a) > (b)) ? (a) : (b))
 #define min(a, b)  (((a) < (b)) ? (a) : (b))
+#endif
 
 /** TODO:
   -Don't hog all the resources and run at 9001 FPS all the time.
@@ -45,7 +49,6 @@ struct AstarCell {
     Vec2 position;
     AstarScore score;
     AstarCell* previous;
-    AstarCell* next;
 };
 
 inline Vec2
@@ -269,27 +272,20 @@ find_walkable_adjacent_cells(Vec2 current_position, Vec2* result_buffer,
 }
 
 static std::vector<Vec2>
-astar_reconstruct_path(std::vector<AstarCell*>* closed_set) {
-    AstarCell* first = 0;
-    for(auto* cell : *closed_set) {
-        if(cell->previous == 0) {
-            first = cell;
-            break;
-        }
-    }
-
+astar_reconstruct_path(AstarCell* goal) {
     std::vector<Vec2> path;
-    AstarCell* current = first;
-    while(current->next != 0) {
+    AstarCell* current = goal;
+    while(current->previous != 0) {
         path.push_back(current->position);
-        current = current->next;
+        current = current->previous;
     }
 
+    std::reverse(path.begin(), path.end()); 
     return path;
 }
 
 static std::vector<Vec2>
-astar(Vec2 start, Vec2 goal,
+find_path_with_astar(Vec2 start, Vec2 goal,
       Vec2* positions, i32 positions_count,
       i32 grid_size)
 {
@@ -298,6 +294,7 @@ astar(Vec2 start, Vec2 goal,
     open_set.reserve(max_count);
     auto closed_set = std::vector<AstarCell*>();
     closed_set.reserve(max_count);
+    //TODO: pass memory from outside. Don't realloc this array every frame boi
     auto* cells = (AstarCell*)calloc(max_count, sizeof(AstarCell));
     i32 cell_counter = 0;
 
@@ -308,7 +305,7 @@ astar(Vec2 start, Vec2 goal,
 
     open_set.push_back(current_cell);
 
-    Vec2 adjacent_cells[8];
+    Vec2 adjacent_cells[4];
 
     do {
         i32 current_index = find_lowest_fscore_index(&open_set, open_set.size());
@@ -340,16 +337,17 @@ astar(Vec2 start, Vec2 goal,
                 cell->position = pos;
                 cell->score = score;
                 cell->previous = current_cell;
-                current_cell->next = cell;
                 open_set.push_back(cell);
             } else {
-                AstarScore scr;
-                scr.G = current_cell->score.G+1;
-                scr.H = astar_heuristic(pos, goal);
-                if(f_score(scr) < f_score(found_cell->score)) {
-                    found_cell->score = scr;
-                    found_cell->previous = current_cell;
-                    current_cell->next = found_cell;
+                if(found_cell->previous) {
+                    if(f_score(current_cell->score) < f_score(found_cell->previous->score)) {
+                        //Don't allow diagonals
+                        if(current_cell->position.x == found_cell->previous->position.x ||
+                           current_cell->position.y == found_cell->previous->position.y)
+                        {
+                            found_cell->previous = current_cell;
+                        }
+                    }
                 }
             }
         }
@@ -359,7 +357,7 @@ astar(Vec2 start, Vec2 goal,
 
     std::vector<Vec2> path;
     if(!closed_set.empty()) {
-        path = astar_reconstruct_path(&closed_set);
+        path = astar_reconstruct_path(current_cell);
     }
 
     free(cells);
@@ -430,7 +428,7 @@ reset_routine(Game* game, Rendering* rendering) {
 
 static void
 game_loop(Game* game) {
-    auto* snake_pos = game->positions;
+    auto* snake_pos = &game->positions[0];
 
 #if 0
     //Player input
@@ -456,53 +454,49 @@ game_loop(Game* game) {
             }
         break;
     }
+#else
+    //Astar
+    auto path = find_path_with_astar(*snake_pos, game->fruit_pos, game->positions, game->snake_cell_count, game->grid_size);
+    if(path.size() > 1) {
+        Vec2 path_next_pos = path[1]; //First element is our own position
+        if(path_next_pos.x == snake_pos->x) { //UP/DOWN
+            if(path_next_pos.y > snake_pos->y) {
+                game->direction = UP;
+            } else if(path_next_pos.y < snake_pos->y) {
+                game->direction = DOWN;
+            } else {
+                DebugBreak(); //Should never happen
+            }
+        } else if(path_next_pos.y == snake_pos->y) { //LEFT/RIGHT
+            if(path_next_pos.x > snake_pos->x) {
+                game->direction = RIGHT;
+            } else if(path_next_pos.x < snake_pos->x) {
+                game->direction = LEFT;
+            } else {
+                DebugBreak(); //Should never happen
+            }
+        } else {
+            DebugBreak(); //Should never happen
+        }
+
+        int i = 0;
+    }
+#endif
 
     switch(game->direction) {
         case UP:
-            ++snake_pos->y;
+            snake_pos->y++;
         break;
         case DOWN:
-            --snake_pos->y;
+            snake_pos->y--;
         break;
         case LEFT:
-            --snake_pos->x;
+            snake_pos->x--;
         break;
         case RIGHT:
-            ++snake_pos->x;
+            snake_pos->x++;
         break;
     }
-#else
-    //Astar
-    auto path = astar(*snake_pos, game->fruit_pos, game->positions, game->snake_cell_count, game->grid_size);
-    if(path.size() > 1) {
-        Vec2 path_next_pos = path[1]; //First element is our own position
-        if(path_next_pos.y < snake_pos->y) {
-            game->direction = DOWN;
-        } else if(path_next_pos.x < snake_pos->x) {
-            game->direction = LEFT;
-        } else if(path_next_pos.y > snake_pos->y) {
-            game->direction = UP;
-        } else if(path_next_pos.x > snake_pos->x) {
-            game->direction = RIGHT;
-        }
-        *snake_pos = path_next_pos;
-    } else {
-        switch(game->direction) {
-            case UP:
-                ++snake_pos->y;
-                break;
-            case DOWN:
-                --snake_pos->y;
-                break;
-            case LEFT:
-                --snake_pos->x;
-                break;
-            case RIGHT:
-                ++snake_pos->x;
-                break;
-        }
-    }
-#endif
 
     for(i32 i = 1; i < game->snake_cell_count; i++) {
         if(snake_pos->x == game->positions[i].x && snake_pos->y == game->positions[i].y) {
