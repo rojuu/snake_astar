@@ -190,15 +190,20 @@ f_score(AstarScore score) {
 }
 
 static i32
-find_lowest_fscore_index(std::vector<AstarCell*>* cells, i32 count) {
+find_lowest_fscore_index(std::vector<AstarCell*>* cells, i32 count, AstarCell* previous_cell) {
     i32 best_index = 0;
     i32 lowest_F = f_score(cells->at(0)->score);
 
     for(i32 i = 1; i < count; i++) {
-        i32 F = f_score(cells->at(i)->score);
+        AstarCell* found_cell = cells->at(i);
+        i32 F = f_score(found_cell->score);
         if(F < lowest_F) {
-            lowest_F = F;
-            best_index = i;
+            if(previous_cell->position.x == found_cell->position.x ||
+               previous_cell->position.y == found_cell->position.y)
+            {
+                lowest_F = F;
+                best_index = i;
+            }
         }
     }
 
@@ -207,7 +212,7 @@ find_lowest_fscore_index(std::vector<AstarCell*>* cells, i32 count) {
 
 inline i32
 astar_heuristic(Vec2 pos, Vec2 goal) {
-    return (i32)distance(pos, goal);
+    return (pos.x - goal.x) + (pos.y - goal.y);
 }
 
 inline b32
@@ -280,7 +285,7 @@ astar_reconstruct_path(AstarCell* goal) {
         current = current->previous;
     }
 
-    std::reverse(path.begin(), path.end()); 
+    std::reverse(path.begin(), path.end());
     return path;
 }
 
@@ -308,7 +313,7 @@ find_path_with_astar(Vec2 start, Vec2 goal,
     Vec2 adjacent_cells[4];
 
     do {
-        i32 current_index = find_lowest_fscore_index(&open_set, open_set.size());
+        i32 current_index = find_lowest_fscore_index(&open_set, open_set.size(), current_cell);
         current_cell = open_set[current_index];
 
         closed_set.push_back(open_set[current_index]);
