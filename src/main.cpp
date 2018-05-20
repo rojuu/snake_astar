@@ -342,8 +342,8 @@ find_path_with_astar(Vec2 start, Vec2 goal,
                 if(found_cell->previous) {
                     if(f_score(current_cell->score) < f_score(found_cell->previous->score)) {
                         //Don't allow diagonals
-                        if(current_cell->position.x == found_cell->previous->position.x ||
-                           current_cell->position.y == found_cell->previous->position.y)
+                        if(current_cell->position.x == found_cell->position.x ||
+                           current_cell->position.y == found_cell->position.y)
                         {
                             found_cell->previous = current_cell;
                         }
