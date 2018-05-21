@@ -37,7 +37,8 @@ typedef i32 b32;
 typedef i64 b64;
 
 struct Vec2 {
-    i32 x, y;
+    i32 x;
+    i32 y;
 };
 
 struct AstarScore {
@@ -198,12 +199,8 @@ find_lowest_fscore_index(std::vector<AstarCell*>* cells, i32 count, AstarCell* p
         AstarCell* found_cell = cells->at(i);
         i32 F = f_score(found_cell->score);
         if(F < lowest_F) {
-            if(previous_cell->position.x == found_cell->position.x ||
-               previous_cell->position.y == found_cell->position.y)
-            {
-                lowest_F = F;
-                best_index = i;
-            }
+            lowest_F = F;
+            best_index = i;
         }
     }
 
@@ -219,7 +216,7 @@ inline b32
 check_walkable_cell(Vec2 pos, Vec2* positions, i32 positions_count) {
     for(i32 i = 0; i < positions_count; i++) {
         Vec2 test_pos = positions[i];
-        if(pos.x == test_pos.x && pos.y == test_pos.y) {
+        if(pos == test_pos) {
             return false;
         }
     }
@@ -256,6 +253,7 @@ find_walkable_adjacent_cells(Vec2 current_position, Vec2* result_buffer,
             candidate_is_not_walkable[j] = true;
             continue;
         }
+
         for(i32 i = 0; i < positions_count; i++) {
             auto compare_pos = positions[i];
             if(candidate_pos == compare_pos) {
@@ -280,7 +278,7 @@ static std::vector<Vec2>
 astar_reconstruct_path(AstarCell* goal) {
     std::vector<Vec2> path;
     AstarCell* current = goal;
-    while(current->previous != 0) {
+    while(current != 0) {
         path.push_back(current->position);
         current = current->previous;
     }
@@ -316,7 +314,7 @@ find_path_with_astar(Vec2 start, Vec2 goal,
         i32 current_index = find_lowest_fscore_index(&open_set, open_set.size(), current_cell);
         current_cell = open_set[current_index];
 
-        closed_set.push_back(open_set[current_index]);
+        closed_set.push_back(current_cell);
         open_set.erase(open_set.begin() + current_index);
 
         if(contains_position(&closed_set, goal)) {
@@ -346,12 +344,8 @@ find_path_with_astar(Vec2 start, Vec2 goal,
             } else {
                 if(found_cell->previous) {
                     if(f_score(current_cell->score) < f_score(found_cell->previous->score)) {
-                        //Don't allow diagonals
-                        if(current_cell->position.x == found_cell->position.x ||
-                           current_cell->position.y == found_cell->position.y)
-                        {
-                            found_cell->previous = current_cell;
-                        }
+                        found_cell->previous = current_cell;
+                        found_cell->score.G = current_cell->score.G+1;
                     }
                 }
             }
