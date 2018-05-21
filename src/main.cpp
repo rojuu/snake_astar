@@ -6,7 +6,7 @@
 
 #include <assert.h>
 
-#if 1
+#if 0
 #include <windows.h>
 #else
 #define max(a, b)  (((a) > (b)) ? (a) : (b))
@@ -464,7 +464,7 @@ game_loop(Game* game) {
             } else if(path_next_pos.y < snake_pos->y) {
                 game->direction = DOWN;
             } else {
-                DebugBreak(); //Should never happen
+                //Should never happen
             }
         } else if(path_next_pos.y == snake_pos->y) { //LEFT/RIGHT
             if(path_next_pos.x > snake_pos->x) {
@@ -472,13 +472,11 @@ game_loop(Game* game) {
             } else if(path_next_pos.x < snake_pos->x) {
                 game->direction = LEFT;
             } else {
-                DebugBreak(); //Should never happen
+                //Should never happen
             }
         } else {
-            DebugBreak(); //Should never happen
+            //Should never happen
         }
-
-        int i = 0;
     }
 #endif
 
