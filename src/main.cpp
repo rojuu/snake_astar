@@ -164,7 +164,7 @@ render_circle(SDL_Renderer *renderer, i32 px, i32 py, i32 radius) {
 
     i32 count = (radius*2) * (radius*2);
     i32 point_count = 0;
-    SDL_Point* point_buffer = (SDL_Point*)malloc(sizeof(SDL_Point) * count * count);
+    SDL_Point* point_buffer = (SDL_Point*)calloc(count*count, sizeof(SDL_Point));
 
     for(i32 x = 0; x < count; x++) {
         for(i32 y = 0; y < count; y++) {
@@ -616,8 +616,8 @@ main(i32 argc, char **argv) {
     game.snake_cell_count = 0;
     game.max_cell_count = game.grid_size * game.grid_size;
     game.input = 0;
-    game.positions = (Vec2*)malloc(sizeof(Vec2) * game.max_cell_count);
-    game.positions_last_frame = (Vec2*)malloc(sizeof(Vec2) * game.max_cell_count);
+    game.positions = (Vec2*)calloc(game.max_cell_count, sizeof(Vec2));
+    game.positions_last_frame = (Vec2*)calloc(game.max_cell_count, sizeof(Vec2));
     game.direction = RIGHT;
     game.collided = false;
     game.flash_count   = 5;
@@ -630,7 +630,7 @@ main(i32 argc, char **argv) {
     rendering.cell_width = rendering.screen_width / game.grid_size;
     rendering.cell_height = rendering.screen_height / game.grid_size;
     rendering.fruit_radius = (rendering.cell_width/2) -3;
-    rendering.rects = (SDL_Rect*)malloc(sizeof(SDL_Rect) * game.max_cell_count);
+    rendering.rects = (SDL_Rect*)calloc(game.max_cell_count, sizeof(SDL_Rect));
     rendering.draw_snake = true;
 
 
