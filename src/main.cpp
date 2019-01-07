@@ -2,7 +2,7 @@
 #include <time.h>
 #include <vector>
 #include <algorithm>
-#include "SDL.h"
+#include <SDL2/SDL.h>
 
 #include <assert.h>
 
