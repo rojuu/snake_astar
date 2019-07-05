@@ -24,3 +24,4 @@ if not exist SDL2.dll (
 cl %CommonCompilerFlags% ..\src\main.cpp /link /subsystem:windows %CommonLinkerFlags% /out:%EXE_NAME%.exe
 popd
 echo Done
+
